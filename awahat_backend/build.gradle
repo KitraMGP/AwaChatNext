@@ -1,0 +1,53 @@
+plugins {
+	id 'java'
+	id 'org.springframework.boot' version '3.5.0'
+	id 'io.spring.dependency-management' version '1.1.7'
+}
+
+repositories {
+	maven {
+		url = 'https://maven.aliyun.com/repository/public/'
+	}
+	mavenCentral()
+}
+
+group = 'kitra'
+version = '0.0.1-SNAPSHOT'
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(17)
+	}
+}
+
+repositories {
+	mavenCentral()
+}
+
+dependencies {
+	// spring boot starter web
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	// validation
+	implementation 'org.springframework.boot:spring-boot-starter-validation'
+	// websocket
+	implementation 'org.springframework.boot:spring-boot-starter-websocket'
+	// mybatis plus
+	implementation 'com.baomidou:mybatis-plus-spring-boot3-starter:3.5.12'
+	// Sa-Token 整合 RedisTemplate
+	implementation 'cn.dev33:sa-token-redis-template:1.42.0'
+	// 提供 Redis 连接池
+	implementation 'org.apache.commons:commons-pool2'
+	// Sa-Token 权限认证，在线文档：https://sa-token.cc
+	implementation 'cn.dev33:sa-token-spring-boot3-starter:1.43.0'
+	// jbcrypt
+	implementation 'org.mindrot:jbcrypt:0.4'
+	// PostgreSQL 驱动
+	implementation 'org.postgresql:postgresql:42.7.6'
+	implementation 'com.fasterxml.jackson.core:jackson-databind'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.named('test') {
+	useJUnitPlatform()
+}
