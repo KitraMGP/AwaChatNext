@@ -1,6 +1,5 @@
 package kitra.awachat.next.util;
 
-import cn.dev33.satoken.util.SaResult;
 import kitra.awachat.next.dto.ApiResponse;
 import org.springframework.http.HttpStatus;
 
