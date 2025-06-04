@@ -2,7 +2,9 @@
 import HomeChatArea from '@/components/home/HomeChatArea.vue';
 import HomeConversationList from '@/components/home/HomeConversationList.vue';
 import type { Conversation } from '@/dto/base';
-import { ref } from 'vue';
+import router from '@/router';
+import { useUserDataStore } from '@/stores/userDataStore';
+import { ref, watch } from 'vue';
 
 // 模拟会话数据
 const conversations = ref<Conversation[]>([
@@ -18,6 +20,16 @@ const selectedConversation = ref<number | null>(null);
 function handleSelectConversation(select: number) {
   selectedConversation.value = select;
 }
+
+const userData = useUserDataStore()
+if (userData.value == null) {
+  router.push('/login')
+}
+watch(userData, (newValue) => {
+  if (newValue.value == null) {
+    router.push('/login')
+  }
+})
 
 </script>
 

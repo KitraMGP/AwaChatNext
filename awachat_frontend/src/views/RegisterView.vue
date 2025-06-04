@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import LoginComponent from '@/components/account/LoginComponent.vue';
+import RegisterComponent from '@/components/account/RegisterComponent.vue';
+
 
 </script>
 
 <template>
   <div class="login-container">
-    <LoginComponent />
+    <RegisterComponent />
   </div>
 </template>
 

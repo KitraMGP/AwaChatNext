@@ -6,3 +6,9 @@ export interface Conversation {
   time: string
   unread: number
 }
+
+export interface ApiResponse<T> {
+  code: number
+  data: T
+  msg: string
+}
