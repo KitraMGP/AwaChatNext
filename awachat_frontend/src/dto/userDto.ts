@@ -9,7 +9,7 @@ export interface UserData {
   avatar: string | null
   createdAt: string
   lastOnlineAt: string
-  role: string
+  role: number
   banUntil: string
   extendedData: object
 }

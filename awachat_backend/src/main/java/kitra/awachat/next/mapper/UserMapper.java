@@ -7,4 +7,5 @@ import org.apache.ibatis.annotations.Mapper;
 @Mapper
 public interface UserMapper extends BaseMapper<UserEntity> {
     // 您可以在这里添加自定义的查询方法
+    int insertUser(UserEntity user);
 }

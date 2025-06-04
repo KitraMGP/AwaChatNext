@@ -1,18 +1,17 @@
 package kitra.awachat.next.entity;
 
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableId;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import kitra.awachat.next.config.JsonbTypeHandler;
 import org.springframework.lang.Nullable;
 
 import java.util.Date;
 import java.util.Map;
 
+@KeySequence(value = "userid_sequence", dbType = DbType.POSTGRE_SQL)
 @TableName(value = "\"user\"", autoResultMap = true)
 public class UserEntity {
-    @TableId(value = "user_id")
-    private int userId;
+    @TableId(value = "user_id", type = IdType.INPUT)
+    private Integer userId;
     private String username;
     private String nickname;
     private String password;
@@ -24,7 +23,7 @@ public class UserEntity {
     @Nullable
     @TableField(value = "last_online_at")
     private Date lastOnlineAt;
-    private short role;
+    private Short role;
     @Nullable
     @TableField(value = "ban_until")
     private Date banUntil;
@@ -32,7 +31,7 @@ public class UserEntity {
     @TableField(value = "extended_data", typeHandler = JsonbTypeHandler.class)
     private Map<String, Object> extendedData;
     @TableField(value = "is_deleted")
-    private boolean isDeleted;
+    private Boolean isDeleted;
 
     public String getAvatar() {
         return avatar;
