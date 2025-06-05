@@ -1,7 +1,6 @@
 package kitra.awachat.next.controller;
 
 import cn.dev33.satoken.exception.NotLoginException;
-import cn.dev33.satoken.util.SaResult;
 import kitra.awachat.next.dto.ApiResponse;
 import kitra.awachat.next.exception.ApiException;
 import kitra.awachat.next.exception.DatabaseOperationException;

@@ -12,6 +12,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.Map;
 
+/**
+ * 用于实现 PostgreSQL JSONB 数据与 Map 类型互转的处理器
+ */
 public class JsonbTypeHandler extends BaseTypeHandler<Map<String, Object>> {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();

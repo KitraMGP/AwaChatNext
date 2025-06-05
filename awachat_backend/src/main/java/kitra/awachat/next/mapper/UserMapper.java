@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface UserMapper extends BaseMapper<UserEntity> {
-    // 您可以在这里添加自定义的查询方法
+    /**
+     * 自定义的用户插入方法，用于规避 MyBatis Plus 不能正确处理自增主键的问题
+     */
     int insertUser(UserEntity user);
 }

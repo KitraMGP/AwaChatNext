@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kitra.awachat.next.mapper.PrivateChatMapper">
+
+    <insert id="insertPrivateChat" parameterType="kitra.awachat.next.entity.PrivateChatEntity">
+        INSERT INTO private_chat (user1_id, user2_id, created_at, updated_at, last_message_id)
+        VALUES (#{user1Id}, #{user2Id}, #{createdAt}, #{updatedAt}, #{lastMessageId})
+    </insert>
+
+</mapper>

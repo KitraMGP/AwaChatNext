@@ -24,3 +24,12 @@ export interface RegisterRequest {
   nickname: string
   password: string
 }
+
+export interface LoginResponse {
+  userData: UserData
+  satoken: string
+}
+
+export interface LogoutResponse {
+  satoken: string
+}

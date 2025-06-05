@@ -74,7 +74,7 @@ function onLogin() {
       showFailMessage("登录失败", getErrorMsg(resp))
       return;
     }
-    userDataStore.set(resp.data.data)
+    userDataStore.set(resp.data.data.userData)
     showSuccessfulMessage("登录成功")
   }).catch(e => {
     showFailMessage("登录失败", e)

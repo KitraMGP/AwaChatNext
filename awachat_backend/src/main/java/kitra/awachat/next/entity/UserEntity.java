@@ -33,6 +33,7 @@ public class UserEntity {
     @TableField(value = "is_deleted")
     private Boolean isDeleted;
 
+    @Nullable
     public String getAvatar() {
         return avatar;
     }
@@ -41,11 +42,12 @@ public class UserEntity {
         this.avatar = avatar;
     }
 
+    @Nullable
     public Date getBanUntil() {
         return banUntil;
     }
 
-    public void setBanUntil(Date banUntil) {
+    public void setBanUntil(@Nullable Date banUntil) {
         this.banUntil = banUntil;
     }
 
@@ -65,11 +67,12 @@ public class UserEntity {
         this.description = description;
     }
 
+    @Nullable
     public Map<String, Object> getExtendedData() {
         return extendedData;
     }
 
-    public void setExtendedData(Map<String, Object> extendedData) {
+    public void setExtendedData(@Nullable Map<String, Object> extendedData) {
         this.extendedData = extendedData;
     }
 
@@ -81,11 +84,12 @@ public class UserEntity {
         isDeleted = deleted;
     }
 
+    @Nullable
     public Date getLastOnlineAt() {
         return lastOnlineAt;
     }
 
-    public void setLastOnlineAt(Date lastOnlineAt) {
+    public void setLastOnlineAt(@Nullable Date lastOnlineAt) {
         this.lastOnlineAt = lastOnlineAt;
     }
 
