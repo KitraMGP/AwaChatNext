@@ -3,8 +3,10 @@ import HomeChatArea from '@/components/home/HomeChatArea.vue';
 import HomeConversationList from '@/components/home/HomeConversationList.vue';
 import type { Conversation } from '@/dto/base';
 import router from '@/router';
+import { getUserInfoApi } from '@/services/userApi';
+import { initWebSocketService } from '@/services/initWebsocket';
 import { useUserDataStore } from '@/stores/userDataStore';
-import { ref, watch } from 'vue';
+import { onMounted, ref, watch } from 'vue';
 
 // 模拟会话数据
 const conversations = ref<Conversation[]>([
@@ -31,6 +33,26 @@ watch(userData, (newValue) => {
   }
 })
 
+// 在组件挂载后调用getUserInfoApi，并在成功时初始化WebSocket连接
+onMounted(async () => {
+  try {
+    // 调用getUserInfoApi检查用户是否已登录
+    // 如果未登录，axios拦截器会自动跳转到登录页面
+    const response = await getUserInfoApi();
+
+    // 如果API调用成功，初始化WebSocket连接
+    if (response.data.code === 200) {
+      userData.set(response.data.data)
+
+      console.log('用户已登录，初始化WebSocket连接');
+      // 初始化WebSocket服务
+      initWebSocketService();
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error);
+    // 错误处理已由axios拦截器完成，这里不需要额外处理
+  }
+});
 </script>
 
 <template>

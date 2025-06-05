@@ -15,7 +15,7 @@ export interface ChatMessageData {
   from: number          // 发送者ID
   to: number            // 接收者ID
   replyTo: number | null // 回复的消息ID
-  content: any          // 消息内容，结构和msgType有关
+  content: unknown      // 消息内容，结构和msgType有关
 }
 
 /**
@@ -70,7 +70,7 @@ export function createReplyTextMessage(conversationId: number, from: number, to:
 /**
  * 创建复合消息
  */
-export function createCompoundMessage(conversationId: number, from: number, to: number, content: any): ChatMessageData {
+export function createCompoundMessage(conversationId: number, from: number, to: number, content: unknown): ChatMessageData {
   return {
     msgType: CHAT_MSG_TYPE.COMPOUND,
     conversationId,

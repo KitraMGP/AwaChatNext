@@ -5,6 +5,7 @@ import kitra.awachat.next.entity.UserEntity;
 import kitra.awachat.next.exception.BadInputException;
 import kitra.awachat.next.exception.LoginFailedException;
 import kitra.awachat.next.exception.UserAlreadyExistsException;
+import kitra.awachat.next.exception.UserNotFoundException;
 import kitra.awachat.next.mapper.UserMapper;
 import kitra.awachat.next.util.UserInfoUtil;
 import org.mindrot.jbcrypt.BCrypt;
@@ -68,5 +69,18 @@ public class UserService {
         // 只调用一次 insert 方法，并将返回值传递给 checkResult
         int insertResult = userMapper.insertUser(user);
         checkResult(insertResult);
+    }
+    
+    /**
+     * 根据用户ID获取用户信息
+     * @param userId 用户ID
+     * @return 用户实体
+     */
+    public UserEntity getUserById(int userId) {
+        UserEntity userEntity = userMapper.selectById(userId);
+        if (userEntity == null) {
+            throw new UserNotFoundException();
+        }
+        return userEntity;
     }
 }

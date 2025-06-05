@@ -16,10 +16,6 @@ const userDataStore = useUserDataStore()
 
 // 检测用户是否已登录，若已登录则回到上一页
 watch(userDataStore, (newValue) => {
-  // 若用户是因为进行登录操作而更改了userDataStore，则不进行这里的跳转
-  if (loginDisabled.value) {
-    return
-  }
   if (newValue.value != null) {
     ElNotification({
       title: "您已登录",
@@ -75,13 +71,15 @@ function onLogin() {
       return;
     }
     userDataStore.set(resp.data.data.userData)
+    // 将token保存到localStorage中
+    localStorage.setItem('satoken', resp.data.data.satoken)
+    
     showSuccessfulMessage("登录成功")
   }).catch(e => {
     showFailMessage("登录失败", e)
     loginDisabled.value = false
   })
 }
-
 </script>
 
 <template>

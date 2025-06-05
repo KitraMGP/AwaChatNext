@@ -14,13 +14,13 @@ class WebSocketService {
   private reconnectInterval = 3000 // 重连间隔，单位毫秒
   private heartbeatInterval: number | null = null
   private url = ''
-  
+
   // 连接状态
   public connected = ref(false)
   // 最后一次接收到的消息
-  public lastMessage = ref<any>(null)
+  public lastMessage = ref<WebSocketMessage<unknown> | null>(null)
   // 消息处理器映射
-  private messageHandlers: Map<string, (data: any) => void> = new Map()
+  private messageHandlers: Map<string, (data: unknown) => void> = new Map()
 
   /**
    * 初始化WebSocket连接
@@ -73,7 +73,7 @@ class WebSocketService {
     console.log('WebSocket连接已建立')
     this.connected.value = true
     this.reconnectAttempts = 0
-    
+
     // 启动心跳
     this.startHeartbeat()
   }
@@ -83,7 +83,7 @@ class WebSocketService {
    */
   private handleMessage(event: MessageEvent): void {
     try {
-      const message = JSON.parse(event.data) as WebSocketMessage<any>
+      const message = JSON.parse(event.data) as WebSocketMessage<unknown>
       this.lastMessage.value = message
 
       // 调用对应类型的消息处理器
@@ -94,7 +94,7 @@ class WebSocketService {
 
       // 特殊处理心跳响应
       if (message.type === MESSAGE_TYPE.HEARTBEAT) {
-        console.debug('收到心跳响应:', message.data)
+        console.debug('收到心跳响应:', message.data as HeartbeatData)
       }
     } catch (error) {
       console.error('处理WebSocket消息失败:', error)
@@ -130,7 +130,7 @@ class WebSocketService {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++
       console.log(`尝试重新连接 (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`)
-      
+
       setTimeout(() => {
         this.connect()
       }, this.reconnectInterval)
@@ -145,7 +145,7 @@ class WebSocketService {
    */
   private startHeartbeat(): void {
     this.stopHeartbeat()
-    
+
     // 每30秒发送一次心跳
     this.heartbeatInterval = window.setInterval(() => {
       this.sendHeartbeat()
@@ -168,7 +168,7 @@ class WebSocketService {
   private sendHeartbeat(): void {
     const heartbeat: WebSocketMessage<null> = {
       type: MESSAGE_TYPE.HEARTBEAT,
-      data: null
+      data: null,
     }
     this.sendMessage(heartbeat)
   }
@@ -201,7 +201,7 @@ class WebSocketService {
   public sendChatMessage(chatMessage: ChatMessageData): boolean {
     const message: WebSocketMessage<ChatMessageData> = {
       type: MESSAGE_TYPE.CHAT,
-      data: chatMessage
+      data: chatMessage,
     }
     return this.sendMessage(message)
   }
@@ -211,7 +211,7 @@ class WebSocketService {
    * @param messageType 消息类型
    * @param handler 处理函数
    */
-  public registerMessageHandler(messageType: string, handler: (data: any) => void): void {
+  public registerMessageHandler(messageType: string, handler: (data: unknown) => void): void {
     this.messageHandlers.set(messageType, handler)
   }
 
@@ -228,12 +228,12 @@ class WebSocketService {
    */
   public disconnect(): void {
     this.stopHeartbeat()
-    
+
     if (this.socket) {
       this.socket.close()
       this.socket = null
     }
-    
+
     this.connected.value = false
   }
 }
