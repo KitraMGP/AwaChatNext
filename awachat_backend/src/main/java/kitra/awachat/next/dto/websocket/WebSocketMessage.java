@@ -7,6 +7,9 @@ public record WebSocketMessage<T>(String type, T data) {
     // 消息类型常量
     public static final String TYPE_CHAT = "chat";
     public static final String TYPE_HEARTBEAT = "heartbeat";
+    public static final String TYPE_SYSTEM = "system";
+    public static final String TYPE_ERROR = "error";
+    public static final String TYPE_ACK = "ack";
 
     // 创建聊天消息的工厂方法
     public static <T> WebSocketMessage<T> createChatMessage(T data) {

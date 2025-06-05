@@ -198,8 +198,8 @@ class WebSocketService {
    * @param chatMessage 聊天消息数据
    * @returns 是否发送成功
    */
-  public sendChatMessage(chatMessage: ChatMessageData): boolean {
-    const message: WebSocketMessage<ChatMessageData> = {
+  public sendChatMessage<T>(chatMessage: ChatMessageData<T>): boolean {
+    const message: WebSocketMessage<ChatMessageData<T>> = {
       type: MESSAGE_TYPE.CHAT,
       data: chatMessage,
     }

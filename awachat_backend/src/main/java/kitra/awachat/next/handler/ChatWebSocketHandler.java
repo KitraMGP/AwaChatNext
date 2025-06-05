@@ -4,8 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kitra.awachat.next.dto.websocket.ChatMessageData;
 import kitra.awachat.next.dto.websocket.HeartbeatData;
+import kitra.awachat.next.dto.websocket.ReadAcknowledgeData;
 import kitra.awachat.next.dto.websocket.WebSocketMessage;
+import kitra.awachat.next.entity.PrivateChatEntity;
 import kitra.awachat.next.service.ChatMessageService;
+import kitra.awachat.next.service.ChatService;
 import kitra.awachat.next.session.WebSocketSessionManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -25,12 +28,14 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     private final WebSocketSessionManager sessionManager;
     private final ChatMessageService chatMessageService;
+    private final ChatService chatService;
     private final ObjectMapper objectMapper;
     private final Logger logger = LogManager.getLogger(ChatWebSocketHandler.class);
 
-    public ChatWebSocketHandler(WebSocketSessionManager sessionManager, ChatMessageService chatMessageService) {
+    public ChatWebSocketHandler(WebSocketSessionManager sessionManager, ChatMessageService chatMessageService, ChatService chatService) {
         this.sessionManager = sessionManager;
         this.chatMessageService = chatMessageService;
+        this.chatService = chatService;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -46,7 +51,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
             // 发送欢迎消息
             try {
-                WebSocketMessage<String> welcomeMessage = new WebSocketMessage<>("system", "连接已建立");
+                WebSocketMessage<String> welcomeMessage = new WebSocketMessage<>(WebSocketMessage.TYPE_SYSTEM, "连接已建立");
                 session.sendMessage(new TextMessage(objectMapper.writeValueAsString(welcomeMessage)));
             } catch (IOException e) {
                 logger.error("发送欢迎消息失败", e);
@@ -85,6 +90,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 case WebSocketMessage.TYPE_HEARTBEAT:
                     handleHeartbeatMessage(userId, session);
                     break;
+                case WebSocketMessage.TYPE_ACK:
+                    handleAcknowledgeMessage(userId, webSocketMessage, session);
+                    break;
                 default:
                     logger.warn("不支持的消息类型：{}", messageType);
                     sendErrorMessage(session, "不支持的消息类型：" + messageType);
@@ -104,11 +112,38 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private void handleChatMessage(Integer userId, WebSocketMessage<?> message, WebSocketSession session) {
         try {
             // 将data部分转换为ChatMessageData
-            ChatMessageData chatMessageData = objectMapper.convertValue(message.data(), ChatMessageData.class);
-
+            ChatMessageData<?> chatMessageData = objectMapper.convertValue(message.data(), ChatMessageData.class);
+    
+            // 1. 验证发送者ID是否匹配
+            if (!userId.equals(chatMessageData.from())) {
+                logger.warn("消息发送者ID不匹配: {} vs {}", userId, chatMessageData.from());
+                sendErrorMessage(session, "消息发送者ID不匹配");
+                return;
+            }
+    
+            // 2. 检查chatId，如果为0则创建新会话
+            Long chatId = chatMessageData.chatId();
+            if (chatId == 0) {
+                // 创建或获取私聊会话
+                PrivateChatEntity chatEntity = chatService.createOrGetPrivateChat(chatMessageData.from(), chatMessageData.to());
+                
+                // 更新chatId
+                chatMessageData = new ChatMessageData<>(
+                    chatMessageData.id(),
+                    chatMessageData.chatType(),
+                    chatMessageData.msgType(),
+                    chatEntity.getChatId(),  // 使用新的chatId
+                    chatMessageData.from(),
+                    chatMessageData.to(),
+                    chatMessageData.replyTo(),
+                    chatMessageData.content(),
+                    chatMessageData.sentAt()
+                );
+            }
+    
             // 处理聊天消息
             boolean success = chatMessageService.handleChatMessage(userId, chatMessageData);
-
+    
             // 发送处理结果
             if (!success) {
                 sendErrorMessage(session, "消息处理失败");
@@ -136,11 +171,32 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
+     * 处理用户已读反馈
+     */
+    private void handleAcknowledgeMessage(Integer userId, WebSocketMessage<?> message, WebSocketSession session) {
+        try {
+            // 将data部分转换为ChatMessageData
+            ReadAcknowledgeData readAckData = objectMapper.convertValue(message.data(), ReadAcknowledgeData.class);
+
+            // 处理聊天消息
+            boolean success = chatMessageService.handleReadAcknowledge(userId, readAckData.chatType(), readAckData.chatId(), readAckData.lastMessageId());
+
+            // 发送处理结果
+            if (!success) {
+                sendErrorMessage(session, "消息处理失败");
+            }
+        } catch (Exception e) {
+            logger.error("处理聊天消息时出错", e);
+            sendErrorMessage(session, "消息格式错误");
+        }
+    }
+
+    /**
      * 发送错误消息
      */
     private void sendErrorMessage(WebSocketSession session, String errorMessage) {
         try {
-            WebSocketMessage<String> errorResponse = new WebSocketMessage<>("error", errorMessage);
+            WebSocketMessage<String> errorResponse = new WebSocketMessage<>(WebSocketMessage.TYPE_ERROR, errorMessage);
             session.sendMessage(new TextMessage(objectMapper.writeValueAsString(errorResponse)));
         } catch (IOException e) {
             logger.error("发送错误消息失败", e);

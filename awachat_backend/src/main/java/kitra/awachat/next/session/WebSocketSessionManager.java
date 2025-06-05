@@ -1,5 +1,6 @@
 package kitra.awachat.next.session;
 
+import kitra.awachat.next.service.UserService;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.WebSocketSession;
 
@@ -18,6 +19,12 @@ public class WebSocketSessionManager {
 
     // Session ID -> 用户ID 映射
     private final ConcurrentMap<String, Integer> sessionToUser = new ConcurrentHashMap<>();
+    
+    private final UserService userService;
+    
+    public WebSocketSessionManager(UserService userService) {
+        this.userService = userService;
+    }
 
     /**
      * 向会话管理器中添加新的 Session，在新的 WebSocket 连接建立的时候调用
@@ -43,10 +50,15 @@ public class WebSocketSessionManager {
         Integer userId = sessionToUser.remove(session.getId());
         if (userId != null) {
             // 因为一个用户 ID 对应的是一个 Set，所以要对该 Set 进行操作
-            userSessions.computeIfPresent(userId, (key, sessions) -> {
+            boolean allSessionsClosed = userSessions.computeIfPresent(userId, (key, sessions) -> {
                 sessions.remove(session);
                 return sessions.isEmpty() ? null : sessions;
-            });
+            }) == null;
+            
+            // 如果用户的所有会话都已关闭，更新最后在线时间
+            if (allSessionsClosed) {
+                userService.updateLastOnlineTime(userId);
+            }
         }
     }
 

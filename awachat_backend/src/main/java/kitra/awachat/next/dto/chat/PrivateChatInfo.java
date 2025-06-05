@@ -5,5 +5,5 @@ import jakarta.annotation.Nullable;
 import java.util.Date;
 
 public record PrivateChatInfo(Long chatId, Integer userId, String username, String nickname, Date createdAt, Date updatedAt,
-                              @Nullable Long lastMessageId) {
+                              @Nullable String lastMessageContent, Integer unreadCount) {
 }

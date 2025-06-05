@@ -1,11 +1,18 @@
 package kitra.awachat.next.service;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kitra.awachat.next.dto.websocket.ChatMessageData;
+import kitra.awachat.next.dto.websocket.ChatMessageType;
+import kitra.awachat.next.dto.websocket.ChatType;
+import kitra.awachat.next.dto.websocket.CompoundMessageContent;
+import kitra.awachat.next.dto.websocket.TextMessageContent;
 import kitra.awachat.next.dto.websocket.WebSocketMessage;
 import kitra.awachat.next.entity.PrivateChatEntity;
+import kitra.awachat.next.entity.PrivateMessageAcknowledgeEntity;
 import kitra.awachat.next.entity.PrivateMessageEntity;
 import kitra.awachat.next.mapper.PrivateChatMapper;
+import kitra.awachat.next.mapper.PrivateMessageAcknowledgeMapper;
 import kitra.awachat.next.mapper.PrivateMessageMapper;
 import kitra.awachat.next.session.WebSocketSessionManager;
 import org.apache.logging.log4j.LogManager;
@@ -28,15 +35,15 @@ public class ChatMessageService {
     private final WebSocketSessionManager sessionManager;
     private final PrivateChatMapper privateChatMapper;
     private final PrivateMessageMapper privateMessageMapper;
+    private final PrivateMessageAcknowledgeMapper privateMessageAcknowledgeMapper; // 新增
     private final ObjectMapper objectMapper;
     private final Logger logger = LogManager.getLogger(ChatMessageService.class);
 
-    public ChatMessageService(WebSocketSessionManager sessionManager,
-                              PrivateChatMapper privateChatMapper,
-                              PrivateMessageMapper privateMessageMapper) {
+    public ChatMessageService(WebSocketSessionManager sessionManager, PrivateChatMapper privateChatMapper, PrivateMessageMapper privateMessageMapper, PrivateMessageAcknowledgeMapper privateMessageAcknowledgeMapper) { // 新增参数
         this.sessionManager = sessionManager;
         this.privateChatMapper = privateChatMapper;
         this.privateMessageMapper = privateMessageMapper;
+        this.privateMessageAcknowledgeMapper = privateMessageAcknowledgeMapper; // 新增
         this.objectMapper = new ObjectMapper();
     }
 
@@ -48,7 +55,7 @@ public class ChatMessageService {
      * @return 是否处理成功
      */
     @Transactional
-    public boolean handleChatMessage(Integer senderId, ChatMessageData messageData) {
+    public boolean handleChatMessage(Integer senderId, ChatMessageData<?> messageData) {
         try {
             // 1. 验证发送者ID是否匹配
             if (!senderId.equals(messageData.from())) {
@@ -57,34 +64,39 @@ public class ChatMessageService {
             }
 
             // 2. 验证会话是否存在
-            PrivateChatEntity chatEntity = privateChatMapper.selectById(messageData.conversationId());
+            PrivateChatEntity chatEntity = privateChatMapper.selectById(messageData.chatId());
             if (chatEntity == null) {
-                logger.warn("会话不存在: {}", messageData.conversationId());
+                logger.warn("会话不存在: {}", messageData.chatId());
                 return false;
             }
 
             // 3. 验证发送者是否属于该会话
             if (!chatEntity.getUser1Id().equals(senderId) && !chatEntity.getUser2Id().equals(senderId)) {
-                logger.warn("用户 {} 不属于会话 {}", senderId, messageData.conversationId());
+                logger.warn("用户 {} 不属于会话 {}", senderId, messageData.chatId());
                 return false;
             }
 
             // 4. 保存消息到数据库
             PrivateMessageEntity messageEntity = new PrivateMessageEntity();
-            messageEntity.setChatId(messageData.conversationId());
+            messageEntity.setChatId(messageData.chatId());
             messageEntity.setSenderId(senderId);
             messageEntity.setReceiverId(messageData.to());
             messageEntity.setReplyTo(messageData.replyTo());
-            messageEntity.setSentAt(new Date());
+            
+            // 设置发送时间
+            Date sentAt = new Date();
+            messageEntity.setSentAt(sentAt);
             messageEntity.setIsDeleted(false);
 
             // 设置消息内容和类型
             Map<String, Object> contentMap = new HashMap<>();
-            if (ChatMessageData.MSG_TYPE_TEXT.equals(messageData.msgType())) {
-                contentMap.put("text", messageData.content());
+            if (messageData.msgType() == ChatMessageType.TEXT) {
+                TextMessageContent textContent = (TextMessageContent) messageData.content();
+                contentMap.put("text", textContent.content());
                 messageEntity.setContentType((short) 0); // 文本消息
-            } else if (ChatMessageData.MSG_TYPE_COMPOUND.equals(messageData.msgType())) {
-                contentMap.put("parts", messageData.content());
+            } else if (messageData.msgType() == ChatMessageType.COMPOUND) {
+                CompoundMessageContent compoundContent = (CompoundMessageContent) messageData.content();
+                contentMap.put("parts", compoundContent.parts());
                 messageEntity.setContentType((short) 1); // 复合消息
             } else {
                 logger.warn("不支持的消息类型: {}", messageData.msgType());
@@ -100,8 +112,21 @@ public class ChatMessageService {
             chatEntity.setUpdatedAt(new Date());
             privateChatMapper.updateById(chatEntity);
 
-            // 6. 转发消息给接收者
-            forwardMessageToReceiver(messageData.to(), WebSocketMessage.createChatMessage(messageData));
+            // 6. 创建包含ID和发送时间的新消息数据
+            ChatMessageData<?> updatedMessageData = new ChatMessageData<>(
+                messageEntity.getMessageId(),
+                messageData.chatType(),
+                messageData.msgType(),
+                messageData.chatId(),
+                messageData.from(),
+                messageData.to(),
+                messageData.replyTo(),
+                messageData.content(),
+                sentAt
+            );
+
+            // 7. 转发消息给接收者
+            forwardMessageToReceiver(messageData.to(), WebSocketMessage.createChatMessage(updatedMessageData));
 
             return true;
         } catch (Exception e) {
@@ -142,6 +167,80 @@ public class ChatMessageService {
             }
         } catch (Exception e) {
             logger.error("转发消息时出错", e);
+        }
+    }
+
+    /**
+     * 处理并存储用户的消息已读请求
+     *
+     * @param userId        用户ID
+     * @param chatType      聊天类型（私聊或群聊）
+     * @param chatId        会话ID
+     * @param lastMessageId 最后一条已读消息ID
+     * @return 是否处理成功
+     */
+    @Transactional
+    public boolean handleReadAcknowledge(Integer userId, ChatType chatType, Long chatId, Long lastMessageId) {
+        try {
+            // 1. 验证聊天类型是否为私聊
+            if (chatType != ChatType.PRIVATE) {
+                logger.warn("不支持的聊天类型: {}", chatType);
+                return false;
+            }
+
+            // 2. 验证会话是否存在
+            PrivateChatEntity chatEntity = privateChatMapper.selectById(chatId);
+            if (chatEntity == null) {
+                logger.warn("会话不存在: {}", chatId);
+                return false;
+            }
+
+            // 3. 验证用户是否属于该会话
+            if (!chatEntity.getUser1Id().equals(userId) && !chatEntity.getUser2Id().equals(userId)) {
+                logger.warn("用户 {} 不属于会话 {}", userId, chatId);
+                return false;
+            }
+
+            // 4. 验证消息是否存在
+            PrivateMessageEntity messageEntity = privateMessageMapper.selectById(lastMessageId);
+            if (messageEntity == null) {
+                logger.warn("消息不存在: {}", lastMessageId);
+                return false;
+            }
+
+            // 5. 验证消息是否属于该会话
+            if (!messageEntity.getChatId().equals(chatId)) {
+                logger.warn("消息 {} 不属于会话 {}", lastMessageId, chatId);
+                return false;
+            }
+
+            // 6. 更新或插入已读记录
+            // 先查询是否已存在记录
+            QueryWrapper<PrivateMessageAcknowledgeEntity> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("chat_id", chatId).eq("user_id", userId);
+
+            PrivateMessageAcknowledgeEntity ackEntity = privateMessageAcknowledgeMapper.selectOne(queryWrapper);
+
+            if (ackEntity == null) {
+                // 不存在记录，插入新记录
+                ackEntity = new PrivateMessageAcknowledgeEntity();
+                ackEntity.setChatId(chatId);
+                ackEntity.setUserId(userId);
+                ackEntity.setLastMessageId(lastMessageId);
+                privateMessageAcknowledgeMapper.insert(ackEntity);
+            } else {
+                // 已存在记录，更新last_message_id
+                // 只有当新的lastMessageId大于现有的lastMessageId时才更新
+                if (lastMessageId > ackEntity.getLastMessageId()) {
+                    ackEntity.setLastMessageId(lastMessageId);
+                    privateMessageAcknowledgeMapper.updateById(ackEntity);
+                }
+            }
+
+            return true;
+        } catch (Exception e) {
+            logger.error("处理消息已读请求时出错", e);
+            return false;
         }
     }
 }

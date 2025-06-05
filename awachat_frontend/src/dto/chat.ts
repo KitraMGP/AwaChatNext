@@ -21,14 +21,15 @@ export interface PrivateChatInfo {
   nickname: string
   createdAt: string
   updatedAt: string
-  lastMessageId: number | null
+  lastMessageContent: string | null
+  unreadCount: number
 }
 
 /**
  * 聊天列表响应接口
  */
 export interface ChatListResponse {
-  chats: ChatInfo<any>[]
+  chats: ChatInfo<PrivateChatInfo>[]
 }
 
 /**

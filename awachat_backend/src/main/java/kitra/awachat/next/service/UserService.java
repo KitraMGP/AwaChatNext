@@ -11,6 +11,8 @@ import kitra.awachat.next.util.UserInfoUtil;
 import org.mindrot.jbcrypt.BCrypt;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
+
 import static kitra.awachat.next.util.DataBaseUtil.checkResult;
 
 @Service
@@ -83,5 +85,27 @@ public class UserService {
             throw new UserNotFoundException();
         }
         return userEntity;
+    }
+    
+    /**
+     * 更新用户最后在线时间
+     *
+     * @param userId 用户ID
+     */
+    public void updateLastOnlineTime(Integer userId) {
+        if (userId == null) {
+            return;
+        }
+        
+        try {
+            UserEntity userEntity = userMapper.selectById(userId);
+            if (userEntity != null) {
+                userEntity.setLastOnlineAt(new Date());
+                userMapper.updateById(userEntity);
+            }
+        } catch (Exception e) {
+            // 记录错误但不抛出异常，避免影响正常的连接关闭流程
+            // 这里可以添加日志记录
+        }
     }
 }

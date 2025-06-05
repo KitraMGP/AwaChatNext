@@ -12,7 +12,7 @@
  Target Server Version : 170005 (170005)
  File Encoding         : 65001
 
- Date: 05/06/2025 16:38:28
+ Date: 05/06/2025 20:58:38
 */
 
 
@@ -108,6 +108,20 @@ COMMENT ON COLUMN "public"."private_message"."sent_at" IS '发送时间（有默
 COMMENT ON COLUMN "public"."private_message"."is_deleted" IS '是否已标记删除（有默认值）';
 
 -- ----------------------------
+-- Table structure for private_message_acknowledge
+-- ----------------------------
+DROP TABLE IF EXISTS "public"."private_message_acknowledge";
+CREATE TABLE "public"."private_message_acknowledge" (
+  "chat_id" int8 NOT NULL,
+  "user_id" int4 NOT NULL,
+  "last_message_id" int8 NOT NULL
+)
+;
+COMMENT ON COLUMN "public"."private_message_acknowledge"."chat_id" IS '会话ID';
+COMMENT ON COLUMN "public"."private_message_acknowledge"."user_id" IS '用户ID';
+COMMENT ON COLUMN "public"."private_message_acknowledge"."last_message_id" IS '最后已读消息ID';
+
+-- ----------------------------
 -- Table structure for user
 -- ----------------------------
 DROP TABLE IF EXISTS "public"."user";
@@ -170,6 +184,11 @@ ALTER TABLE "public"."private_chat" ADD CONSTRAINT "private_chat_pkey" PRIMARY K
 ALTER TABLE "public"."private_message" ADD CONSTRAINT "private_message_pkey" PRIMARY KEY ("message_id");
 
 -- ----------------------------
+-- Primary Key structure for table private_message_acknowledge
+-- ----------------------------
+ALTER TABLE "public"."private_message_acknowledge" ADD CONSTRAINT "private_message_acknowledge_pkey" PRIMARY KEY ("chat_id", "user_id");
+
+-- ----------------------------
 -- Primary Key structure for table user
 -- ----------------------------
 ALTER TABLE "public"."user" ADD CONSTRAINT "user_pkey" PRIMARY KEY ("user_id");
@@ -194,3 +213,11 @@ ALTER TABLE "public"."private_message" ADD CONSTRAINT "priv_msg_chat_id" FOREIGN
 ALTER TABLE "public"."private_message" ADD CONSTRAINT "priv_msg_receiver_id" FOREIGN KEY ("receiver_id") REFERENCES "public"."user" ("user_id") ON DELETE RESTRICT ON UPDATE NO ACTION;
 ALTER TABLE "public"."private_message" ADD CONSTRAINT "priv_msg_reply_to" FOREIGN KEY ("reply_to") REFERENCES "public"."private_message" ("message_id") ON DELETE SET NULL ON UPDATE NO ACTION;
 ALTER TABLE "public"."private_message" ADD CONSTRAINT "priv_msg_sender_id" FOREIGN KEY ("sender_id") REFERENCES "public"."user" ("user_id") ON DELETE RESTRICT ON UPDATE NO ACTION;
+
+-- ----------------------------
+-- Foreign Keys structure for table private_message_acknowledge
+-- ----------------------------
+ALTER TABLE "public"."private_message_acknowledge" ADD CONSTRAINT "last_message_id" FOREIGN KEY ("last_message_id") REFERENCES "public"."private_message" ("message_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE "public"."private_message_acknowledge" ADD CONSTRAINT "private_ack_chat_id" FOREIGN KEY ("chat_id") REFERENCES "public"."private_chat" ("chat_id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."private_message_acknowledge" ADD CONSTRAINT "private_ack_user_id" FOREIGN KEY ("user_id") REFERENCES "public"."user" ("user_id") ON DELETE CASCADE ON UPDATE CASCADE;
+COMMENT ON CONSTRAINT "last_message_id" ON "public"."private_message_acknowledge" IS '仅用于比较大小。原消息可能不存在';

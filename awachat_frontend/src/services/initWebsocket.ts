@@ -37,7 +37,7 @@ function registerMessageHandlers(): void {
  * 处理聊天消息
  * @param data 聊天消息数据
  */
-function handleChatMessage(data: ChatMessageData): void {
+function handleChatMessage(data: ChatMessageData<unknown>): void {
   console.log('收到聊天消息:', data)
   // 这里可以添加消息通知、更新聊天界面等逻辑
   // 例如：将消息添加到聊天记录、更新未读消息计数等
