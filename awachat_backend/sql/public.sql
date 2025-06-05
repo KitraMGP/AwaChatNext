@@ -12,7 +12,7 @@
  Target Server Version : 170005 (170005)
  File Encoding         : 65001
 
- Date: 05/06/2025 10:37:20
+ Date: 05/06/2025 16:38:28
 */
 
 
@@ -48,6 +48,18 @@ MINVALUE  1
 MAXVALUE 2147483647
 START 1
 CACHE 1;
+
+-- ----------------------------
+-- Table structure for friend
+-- ----------------------------
+DROP TABLE IF EXISTS "public"."friend";
+CREATE TABLE "public"."friend" (
+  "user1" int4 NOT NULL,
+  "user2" int4 NOT NULL
+)
+;
+COMMENT ON COLUMN "public"."friend"."user1" IS '用户1 ID';
+COMMENT ON COLUMN "public"."friend"."user2" IS '用户2 ID';
 
 -- ----------------------------
 -- Table structure for private_chat
@@ -140,7 +152,12 @@ SELECT setval('"public"."private_message_seq"', 1, false);
 -- ----------------------------
 -- Alter sequences owned by
 -- ----------------------------
-SELECT setval('"public"."userid_sequence"', 4, true);
+SELECT setval('"public"."userid_sequence"', 6, true);
+
+-- ----------------------------
+-- Primary Key structure for table friend
+-- ----------------------------
+ALTER TABLE "public"."friend" ADD CONSTRAINT "friend_pkey" PRIMARY KEY ("user1", "user2");
 
 -- ----------------------------
 -- Primary Key structure for table private_chat
@@ -156,6 +173,12 @@ ALTER TABLE "public"."private_message" ADD CONSTRAINT "private_message_pkey" PRI
 -- Primary Key structure for table user
 -- ----------------------------
 ALTER TABLE "public"."user" ADD CONSTRAINT "user_pkey" PRIMARY KEY ("user_id");
+
+-- ----------------------------
+-- Foreign Keys structure for table friend
+-- ----------------------------
+ALTER TABLE "public"."friend" ADD CONSTRAINT "friend_user1" FOREIGN KEY ("user1") REFERENCES "public"."user" ("user_id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "public"."friend" ADD CONSTRAINT "friend_user2" FOREIGN KEY ("user2") REFERENCES "public"."user" ("user_id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- ----------------------------
 -- Foreign Keys structure for table private_chat

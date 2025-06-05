@@ -25,6 +25,7 @@ public class UserInfoController {
 
     /**
      * 获取用户信息
+     *
      * @param userId 可选的用户ID参数，如果不提供则返回当前登录用户的信息
      * @return 用户信息
      */
@@ -34,10 +35,10 @@ public class UserInfoController {
         if (userId == null) {
             userId = StpUtil.getLoginIdAsInt();
         }
-        
+
         // 获取用户信息
         UserEntity userEntity = userService.getUserById(userId);
-        
+
         // 构建返回数据
         UserDataResponse userData = new UserDataResponse(
             userEntity.getUserId(),
@@ -51,7 +52,7 @@ public class UserInfoController {
             userEntity.getBanUntil(),
             userEntity.getExtendedData()
         );
-        
+
         return ApiUtil.successfulResponse(userData);
     }
 }

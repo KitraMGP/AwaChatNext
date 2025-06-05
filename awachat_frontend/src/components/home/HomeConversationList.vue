@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { Conversation } from '@/dto/base';
+import type { DisplayConversation } from '@/dto/chat';
 import SimpleAvatar from '../avatar/SimpleAvatar.vue';
 
 const props = defineProps<{
-  conversations: Conversation[],
+  conversations: DisplayConversation[],
   selectedConversation: number | null
 }>()
 

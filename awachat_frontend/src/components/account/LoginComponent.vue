@@ -73,7 +73,7 @@ function onLogin() {
     userDataStore.set(resp.data.data.userData)
     // 将token保存到localStorage中
     localStorage.setItem('satoken', resp.data.data.satoken)
-    
+
     showSuccessfulMessage("登录成功")
   }).catch(e => {
     showFailMessage("登录失败", e)

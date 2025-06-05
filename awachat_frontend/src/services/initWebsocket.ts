@@ -11,10 +11,10 @@ export function initWebSocketService(): void {
   // 使用相对路径，通过vite代理访问WebSocket服务
   // 不再指定具体的主机名和端口号，而是使用相对路径
   const baseUrl = window.location.origin
-  
+
   // 初始化WebSocket连接
   websocketService.init(baseUrl)
-  
+
   // 注册消息处理器
   registerMessageHandlers()
 }
@@ -25,10 +25,10 @@ export function initWebSocketService(): void {
 function registerMessageHandlers(): void {
   // 注册聊天消息处理器
   websocketService.registerMessageHandler(MESSAGE_TYPE.CHAT, handleChatMessage)
-  
+
   // 注册系统消息处理器
   websocketService.registerMessageHandler(MESSAGE_TYPE.SYSTEM, handleSystemMessage)
-  
+
   // 注册错误消息处理器
   websocketService.registerMessageHandler(MESSAGE_TYPE.ERROR, handleErrorMessage)
 }

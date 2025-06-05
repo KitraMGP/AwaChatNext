@@ -7,7 +7,7 @@ const props = defineProps<{
 <template>
   <!-- 右侧聊天界面 -->
   <div class="chat-area">
-    <template v-if="props.selectedConversation">
+    <template v-if="props.selectedConversation !== null">
       <!-- 这里将来放置聊天内容 -->
       <div class="chat-messages">
         <!-- 聊天消息将在这里显示 -->

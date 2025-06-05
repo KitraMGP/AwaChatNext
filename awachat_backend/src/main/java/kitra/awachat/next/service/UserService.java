@@ -70,9 +70,10 @@ public class UserService {
         int insertResult = userMapper.insertUser(user);
         checkResult(insertResult);
     }
-    
+
     /**
      * 根据用户ID获取用户信息
+     *
      * @param userId 用户ID
      * @return 用户实体
      */
