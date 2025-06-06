@@ -86,7 +86,7 @@ public class UserService {
         }
         return userEntity;
     }
-    
+
     /**
      * 更新用户最后在线时间
      *
@@ -96,7 +96,7 @@ public class UserService {
         if (userId == null) {
             return;
         }
-        
+
         try {
             UserEntity userEntity = userMapper.selectById(userId);
             if (userEntity != null) {
@@ -107,5 +107,21 @@ public class UserService {
             // 记录错误但不抛出异常，避免影响正常的连接关闭流程
             // 这里可以添加日志记录
         }
+    }
+
+    /**
+     * 根据用户名获取用户信息
+     *
+     * @param username 用户名
+     * @return 用户实体
+     */
+    public UserEntity getUserByUsername(String username) {
+        QueryWrapper<UserEntity> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("username", username);
+        UserEntity userEntity = userMapper.selectOne(queryWrapper);
+        if (userEntity == null) {
+            throw new UserNotFoundException();
+        }
+        return userEntity;
     }
 }

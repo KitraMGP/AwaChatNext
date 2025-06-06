@@ -9,7 +9,8 @@ public record WebSocketMessage<T>(String type, T data) {
     public static final String TYPE_HEARTBEAT = "heartbeat";
     public static final String TYPE_SYSTEM = "system";
     public static final String TYPE_ERROR = "error";
-    public static final String TYPE_ACK = "ack";
+    public static final String TYPE_ACK = "ack"; // 已读反馈
+    public static final String TYPE_REQUEST_CHAT_HISTORY = "request_chat_history"; // 客户端请求历史消息/服务端发送历史消息
 
     // 创建聊天消息的工厂方法
     public static <T> WebSocketMessage<T> createChatMessage(T data) {

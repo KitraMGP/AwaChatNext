@@ -13,4 +13,15 @@ public class DataBaseUtil {
             throw new DatabaseOperationException();
         }
     }
+
+    /**
+     * 判断数据库操作返回值是否大于等于1。若小于1，则抛出{@link DatabaseOperationException}
+     *
+     * @param result 数据操作方法的返回值
+     */
+    public static void checkResultGreaterThanZero(long result) {
+        if (result < 1) {
+            throw new DatabaseOperationException();
+        }
+    }
 }

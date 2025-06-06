@@ -1,4 +1,5 @@
 import type {
+  AcceptFriendRequestRequest,
   LoginRequest,
   LoginResponse,
   LogoutResponse,
@@ -15,7 +16,17 @@ export const registerApi = (r: RegisterRequest) =>
 export const loginApi = (r: LoginRequest) =>
   api.post<LoginRequest, AxiosResponse<ApiResponse<LoginResponse>>>('/user/login', r)
 
-export const logoutApi = () => api.post<AxiosResponse<ApiResponse<LogoutResponse>>>('/user/logout')
+export const logoutApi = () =>
+  api.post<null, AxiosResponse<ApiResponse<LogoutResponse>>>('/user/logout')
 
-export const getUserInfoApi = (userId?: number) =>
-  api.get<ApiResponse<UserData>>(`/user/info${userId ? `?userId=${userId}` : ''}`)
+// 修改getUserInfoApi函数，添加username参数
+export const getUserInfoApi = (userId?: number, username?: string) =>
+  api.get<ApiResponse<UserData>>(
+    `/user/info${userId ? `?userId=${userId}` : ''}${username ? `?username=${username}` : ''}`,
+  )
+
+export const acceptFriendRequestApi = (r: AcceptFriendRequestRequest) =>
+  api.post<AcceptFriendRequestRequest, AxiosResponse<ApiResponse<null>>>(
+    '/user/acceptFriendRequest',
+    r,
+  )

@@ -19,9 +19,9 @@ public class WebSocketSessionManager {
 
     // Session ID -> 用户ID 映射
     private final ConcurrentMap<String, Integer> sessionToUser = new ConcurrentHashMap<>();
-    
+
     private final UserService userService;
-    
+
     public WebSocketSessionManager(UserService userService) {
         this.userService = userService;
     }
@@ -54,7 +54,7 @@ public class WebSocketSessionManager {
                 sessions.remove(session);
                 return sessions.isEmpty() ? null : sessions;
             }) == null;
-            
+
             // 如果用户的所有会话都已关闭，更新最后在线时间
             if (allSessionsClosed) {
                 userService.updateLastOnlineTime(userId);

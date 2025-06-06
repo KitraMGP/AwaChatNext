@@ -14,18 +14,62 @@ export type ChatType = 'private' | 'group'
 // ChatType常量
 export const ChatType = {
   PRIVATE: 'private' as ChatType,
-  GROUP: 'group' as ChatType
+  GROUP: 'group' as ChatType,
 }
 
 /**
  * 消息类型
  */
-export type ChatMessageType = 'text' | 'compound'
+export type ChatMessageType = 'text' | 'compound' | 'friend_request'
 
 // ChatMessageType常量
 export const ChatMessageType = {
   TEXT: 'text' as ChatMessageType,
-  COMPOUND: 'compound' as ChatMessageType
+  COMPOUND: 'compound' as ChatMessageType,
+  FRIEND_REQUEST: 'friend_request' as ChatMessageType,
+}
+
+/**
+ * 好友请求消息内容
+ */
+export interface FriendRequestMessageContent {
+  isAccepted: boolean
+}
+
+/**
+ * 聊天消息数据结构
+ */
+export interface ChatMessageData<
+  T = TextMessageContent | CompoundMessageContent | FriendRequestMessageContent,
+> {
+  id?: number // 消息ID（可选）
+  chatType: ChatType // 聊天类型：私聊或群聊
+  msgType: ChatMessageType // 消息类型：文本、复合或好友请求
+  chatId: number // 聊天ID
+  from: number // 发送者ID
+  to: number // 接收者ID
+  replyTo?: number // 回复的消息ID（可选）
+  content: T // 消息内容，结构和msgType有关
+  sentAt?: string // 发送时间（可选，ISO格式字符串）
+}
+
+/**
+ * 创建好友请求消息
+ */
+export function createFriendRequestMessage(
+  chatId: number,
+  from: number,
+  to: number,
+  isAccepted: boolean = false,
+): ChatMessageData<FriendRequestMessageContent> {
+  return {
+    chatType: ChatType.PRIVATE,
+    msgType: ChatMessageType.FRIEND_REQUEST,
+    chatId,
+    from,
+    to,
+    content: { isAccepted },
+  }
 }
 
 /**
@@ -36,7 +80,7 @@ export type CompoundMessagePartType = 'text' | 'image'
 // CompoundMessagePartType常量
 export const CompoundMessagePartType = {
   TEXT: 'text' as CompoundMessagePartType,
-  IMAGE: 'image' as CompoundMessagePartType
+  IMAGE: 'image' as CompoundMessagePartType,
 }
 
 /**
@@ -62,21 +106,6 @@ export interface CompoundMessageContent {
 }
 
 /**
- * 聊天消息的数据结构
- */
-export interface ChatMessageData<T = TextMessageContent | CompoundMessageContent> {
-  id?: number            // 消息ID（可选）
-  chatType: ChatType       // 聊天类型：私聊或群聊
-  msgType: ChatMessageType // 消息类型：文本或复合
-  chatId: number           // 聊天ID
-  from: number             // 发送者ID
-  to: number               // 接收者ID
-  replyTo?: number         // 回复的消息ID（可选）
-  content: T               // 消息内容，结构和msgType有关
-  sentAt?: string          // 发送时间（可选，ISO格式字符串）
-}
-
-/**
  * 心跳消息的数据结构
  */
 export interface HeartbeatData {
@@ -88,47 +117,66 @@ export const MESSAGE_TYPE = {
   CHAT: 'chat',
   HEARTBEAT: 'heartbeat',
   ERROR: 'error',
-  SYSTEM: 'system'
+  SYSTEM: 'system',
+  ACK: 'ack', // 仅客户端发送
+  REQUEST_CHAT_HISTORY: 'request_chat_history', // 仅客户端发送
 }
 
 /**
  * 创建文本聊天消息
  */
-export function createTextMessage(chatId: number, from: number, to: number, text: string): ChatMessageData<TextMessageContent> {
+export function createTextMessage(
+  chatId: number,
+  from: number,
+  to: number,
+  text: string,
+): ChatMessageData<TextMessageContent> {
   return {
     chatType: ChatType.PRIVATE,
     msgType: ChatMessageType.TEXT,
     chatId,
     from,
     to,
-    content: { content: text }
+    content: { content: text },
   }
 }
 
 /**
  * 创建复合消息
  */
-export function createCompoundMessage(chatId: number, from: number, to: number, parts: CompoundMessagePart[]): ChatMessageData<CompoundMessageContent> {
+export function createCompoundMessage(
+  chatId: number,
+  from: number,
+  to: number,
+  parts: CompoundMessagePart[],
+): ChatMessageData<CompoundMessageContent> {
   return {
     chatType: ChatType.PRIVATE,
     msgType: ChatMessageType.COMPOUND,
     chatId,
     from,
     to,
-    content: { parts }
+    content: { parts },
   }
 }
 
 // 聊天消息类型常量
 export const CHAT_MSG_TYPE = {
   TEXT: 'text',
-  COMPOUND: 'compound'
+  COMPOUND: 'compound',
 }
 
 /**
  * 创建回复文本消息
  */
-export function createReplyTextMessage(chatType: ChatType, chatId: number, from: number, to: number, replyTo: number, text: string): ChatMessageData {
+export function createReplyTextMessage(
+  chatType: ChatType,
+  chatId: number,
+  from: number,
+  to: number,
+  replyTo: number,
+  text: string,
+): ChatMessageData {
   return {
     chatType: chatType,
     msgType: ChatMessageType.TEXT,
@@ -137,7 +185,29 @@ export function createReplyTextMessage(chatType: ChatType, chatId: number, from:
     to,
     replyTo: replyTo,
     content: {
-      content: text
-    }
+      content: text,
+    },
   }
+}
+
+/**
+ * 请求聊天历史消息数据结构
+ */
+export interface RequestChatHistoryData {
+  chatType: ChatType
+  chatId: number
+  lastMessageId?: number
+}
+
+/**
+ * 客户端接收服务端发送的历史消息数据结构
+ */
+export interface ChatHistoryData {
+  history: ChatMessageData[]
+}
+
+export interface ReadAcknowledgeData {
+  chatType: ChatType
+  chatId: number
+  lastMessageId: number
 }

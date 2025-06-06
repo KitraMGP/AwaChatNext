@@ -1,8 +1,6 @@
 package kitra.awachat.next.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import kitra.awachat.next.dto.chat.ChatInfo;
 import kitra.awachat.next.dto.chat.ChatType;
 import kitra.awachat.next.dto.chat.PrivateChatInfo;
@@ -35,9 +33,9 @@ public class ChatService {
     private final PrivateMessageAcknowledgeMapper privateMessageAcknowledgeMapper;
     private final Logger logger = LogManager.getLogger(ChatService.class);
 
-    public ChatService(UserMapper userMapper, PrivateChatMapper privateChatMapper, 
-                      PrivateMessageMapper privateMessageMapper,
-                      PrivateMessageAcknowledgeMapper privateMessageAcknowledgeMapper) {
+    public ChatService(UserMapper userMapper, PrivateChatMapper privateChatMapper,
+                       PrivateMessageMapper privateMessageMapper,
+                       PrivateMessageAcknowledgeMapper privateMessageAcknowledgeMapper) {
         this.userMapper = userMapper;
         this.privateChatMapper = privateChatMapper;
         this.privateMessageMapper = privateMessageMapper;
@@ -56,9 +54,9 @@ public class ChatService {
         // 遍历私聊会话，获取对方用户信息
         for (PrivateChatEntity chatEntity : privateChatEntities) {
             // 确定对方用户ID
-            Integer otherUserId = chatEntity.getUser1Id().equals(currentUserId) ? 
-                                  chatEntity.getUser2Id() : chatEntity.getUser1Id();
-            
+            Integer otherUserId = chatEntity.getUser1Id().equals(currentUserId) ?
+                chatEntity.getUser2Id() : chatEntity.getUser1Id();
+
             // 获取对方用户信息
             UserEntity otherUser = userMapper.selectById(otherUserId);
             if (otherUser == null) {
@@ -102,7 +100,7 @@ public class ChatService {
 
     /**
      * 获取消息内容
-     * 
+     *
      * @param message 消息实体
      * @return 消息内容文本
      */
@@ -116,6 +114,8 @@ public class ChatService {
                 }
             } else if (message.getContentType() == 1) { // 复合消息
                 return "[复合消息]";
+            } else if (message.getContentType() == 2) { // 好友请求
+                return "[好友请求]";
             }
         } catch (Exception e) {
             logger.error("解析消息内容失败", e);
@@ -125,7 +125,7 @@ public class ChatService {
 
     /**
      * 计算未读消息数量
-     * 
+     *
      * @param chatId 聊天ID
      * @param userId 用户ID
      * @return 未读消息数量
@@ -135,7 +135,7 @@ public class ChatService {
         QueryWrapper<PrivateMessageAcknowledgeEntity> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("chat_id", chatId).eq("user_id", userId);
         PrivateMessageAcknowledgeEntity ack = privateMessageAcknowledgeMapper.selectOne(queryWrapper);
-        
+
         if (ack == null || ack.getLastMessageId() == null) {
             // 如果没有已读记录，查询该会话的所有消息数量
             QueryWrapper<PrivateMessageEntity> msgQuery = new QueryWrapper<>();
@@ -145,9 +145,9 @@ public class ChatService {
             // 查询大于已读消息ID的消息数量
             QueryWrapper<PrivateMessageEntity> msgQuery = new QueryWrapper<>();
             msgQuery.eq("chat_id", chatId)
-                   .eq("receiver_id", userId)
-                   .gt("message_id", ack.getLastMessageId())
-                   .eq("is_deleted", false);
+                .eq("receiver_id", userId)
+                .gt("message_id", ack.getLastMessageId())
+                .eq("is_deleted", false);
             return privateMessageMapper.selectCount(msgQuery).intValue();
         }
     }
@@ -178,11 +178,11 @@ public class ChatService {
             chatEntity = new PrivateChatEntity();
             chatEntity.setUser1Id(user1Id);
             chatEntity.setUser2Id(user2Id);
-            
+
             Date now = new Date();
             chatEntity.setCreatedAt(now);
             chatEntity.setUpdatedAt(now);
-            
+
             // 插入数据库
             checkResult(privateChatMapper.insertPrivateChat(chatEntity));
         }

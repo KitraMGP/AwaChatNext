@@ -1,20 +1,142 @@
 <script setup lang="ts">
 import type { DisplayConversation } from '@/dto/chat';
 import SimpleAvatar from '../avatar/SimpleAvatar.vue';
+import { ref } from 'vue';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { getUserInfoApi, logoutApi } from '@/services/userApi';
+import { useUserDataStore } from '@/stores/userDataStore';
+import { websocketService } from '@/services/websocketService';
+import { createFriendRequestMessage } from '@/dto/websocket';
+import router from '@/router';
 
 const props = defineProps<{
   conversations: DisplayConversation[],
   selectedConversation: number | null
 }>()
 
+const userDataStore = useUserDataStore()
 const emit = defineEmits(["select-conversation"])
 
-// 下拉菜单选项，改为function定义并添加参数类型
+// 添加好友对话框
+const addFriendDialogVisible = ref(false);
+const usernameInput = ref('');
+
+// 下拉菜单选项
 function handleCommand(command: string): void {
   // 处理菜单命令
   console.log(`点击了${command}选项`);
+
+  if (command === 'addFriend') {
+    // 显示添加好友对话框
+    addFriendDialogVisible.value = true;
+    usernameInput.value = ''; // 清空输入框
+  } else if (command === 'logout') {
+    logout()
+  }
 }
 
+// 退出登录按钮逻辑
+async function logout() {
+  try {
+    const resp = await logoutApi()
+    if (resp.data.code === 200) {
+      userDataStore.clear()
+      localStorage.removeItem('satoken')
+      ElMessage({
+        message: '您已退出登录',
+        type: 'success'
+      })
+      router.replace('/login')
+    } else {
+      ElMessage({
+        message: resp.data.msg,
+        type: 'warning'
+      })
+    }
+  } catch (e) {
+    ElMessage({
+      message: '发生错误',
+      type: 'warning'
+    })
+    console.error(e)
+  }
+}
+
+// 处理添加好友
+async function handleAddFriend() {
+  if (!usernameInput.value) {
+    ElMessage.warning('请输入用户名');
+    return;
+  }
+
+  try {
+    // 调用用户信息API查询用户
+    const response = await getUserInfoApi(undefined, usernameInput.value);
+
+    if (response.data.code === 200) {
+      const userData = response.data.data;
+
+      // 检查用户是否存在
+      if (!userData) {
+        ElMessage.error('用户不存在');
+        return;
+      }
+
+      // 检查是否已经是好友
+      if (userData.isFriend) {
+        ElMessage.warning('该用户已经是您的好友');
+        return;
+      }
+
+      // 检查是否为自己
+      if (userDataStore.value?.userId === userData.userId) {
+        ElMessage.warning('不能添加自己为好友');
+        return;
+      }
+
+      // 确认是否发送好友请求
+      ElMessageBox.confirm(
+        `确定要向 ${userData.nickname || userData.username} 发送好友请求吗？`,
+        '发送好友请求',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'info',
+        }
+      ).then(() => {
+        // 获取当前用户ID
+        const currentUserStore = useUserDataStore();
+        const currentUserId = currentUserStore.value?.userId;
+
+        if (!currentUserId) {
+          ElMessage.error('获取当前用户信息失败');
+          return;
+        }
+
+        // 创建好友请求消息
+        const friendRequestMessage = createFriendRequestMessage(
+          0, // chatId为0，表示新会话
+          currentUserId,
+          userData.userId,
+          false // isAccepted初始为false
+        );
+
+        // 发送好友请求消息
+        websocketService.sendChatMessage(friendRequestMessage);
+
+        ElMessage.success('好友请求已发送');
+        addFriendDialogVisible.value = false; // 关闭对话框
+      }).catch(() => {
+        // 用户取消操作
+      });
+    } else {
+      ElMessage.error(response.data.msg || '查询用户失败');
+    }
+  } catch (error) {
+    console.error('查询用户失败:', error);
+    ElMessage.error('查询用户失败，请稍后重试');
+  }
+}
 </script>
 
 <template>
@@ -37,6 +159,22 @@ function handleCommand(command: string): void {
       </el-dropdown>
     </div>
 
+    <!-- 添加好友对话框 -->
+    <el-dialog v-model="addFriendDialogVisible" title="添加好友" width="30%" center>
+      <el-form>
+        <el-form-item label="用户名">
+          <el-input v-model="usernameInput" placeholder="请输入用户名"></el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="addFriendDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleAddFriend">查找并添加</el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 会话列表 -->
     <div class="conversation-items">
       <div v-for="item in props.conversations" :key="item.id" class="conversation-item"
         :class="{ 'active': selectedConversation === item.id }" @click="emit('select-conversation', item.id)">

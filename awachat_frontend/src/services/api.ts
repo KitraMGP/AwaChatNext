@@ -1,7 +1,7 @@
 import type { ApiResponse } from '@/dto/base'
 import router from '@/router'
 import axios, { AxiosError, type AxiosResponse } from 'axios'
-import { ElNotification } from 'element-plus'
+import { ElMessage } from 'element-plus'
 
 export const api = axios.create({
   baseURL: '/api/',
@@ -72,9 +72,8 @@ export const showFailMessage = (title: string, e: AxiosError | string | unknown)
     console.error('未知错误：', e)
   }
   console.error(message)
-  ElNotification({
+  ElMessage({
     type: 'error',
-    title: title,
     message: message,
   })
 }
@@ -82,11 +81,9 @@ export const showFailMessage = (title: string, e: AxiosError | string | unknown)
 /**
  * 横幅展示成功信息
  */
-export const showSuccessfulMessage = (title: string) => {
-  ElNotification({
+export const showSuccessfulMessage = (content: string) => {
+  ElMessage({
     type: 'success',
-    title: title,
-    message: '',
-    duration: 2000,
+    message: content,
   })
 }

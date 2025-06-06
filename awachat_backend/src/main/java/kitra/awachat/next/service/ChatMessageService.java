@@ -2,12 +2,7 @@ package kitra.awachat.next.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kitra.awachat.next.dto.websocket.ChatMessageData;
-import kitra.awachat.next.dto.websocket.ChatMessageType;
-import kitra.awachat.next.dto.websocket.ChatType;
-import kitra.awachat.next.dto.websocket.CompoundMessageContent;
-import kitra.awachat.next.dto.websocket.TextMessageContent;
-import kitra.awachat.next.dto.websocket.WebSocketMessage;
+import kitra.awachat.next.dto.websocket.*;
 import kitra.awachat.next.entity.PrivateChatEntity;
 import kitra.awachat.next.entity.PrivateMessageAcknowledgeEntity;
 import kitra.awachat.next.entity.PrivateMessageEntity;
@@ -23,12 +18,10 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 import static kitra.awachat.next.util.DataBaseUtil.checkResult;
+import static kitra.awachat.next.util.DataBaseUtil.checkResultGreaterThanZero;
 
 @Service
 public class ChatMessageService {
@@ -48,7 +41,7 @@ public class ChatMessageService {
     }
 
     /**
-     * 处理接收到的聊天消息
+     * 处理接收到的聊天消息，实际功能为：将聊天消息写入数据库，然后分别转发给接收者和发送者
      *
      * @param senderId    发送者ID
      * @param messageData 消息数据
@@ -82,7 +75,7 @@ public class ChatMessageService {
             messageEntity.setSenderId(senderId);
             messageEntity.setReceiverId(messageData.to());
             messageEntity.setReplyTo(messageData.replyTo());
-            
+
             // 设置发送时间
             Date sentAt = new Date();
             messageEntity.setSentAt(sentAt);
@@ -91,13 +84,19 @@ public class ChatMessageService {
             // 设置消息内容和类型
             Map<String, Object> contentMap = new HashMap<>();
             if (messageData.msgType() == ChatMessageType.TEXT) {
-                TextMessageContent textContent = (TextMessageContent) messageData.content();
+                TextMessageContent textContent = objectMapper.convertValue(messageData.content(), TextMessageContent.class);
                 contentMap.put("text", textContent.content());
                 messageEntity.setContentType((short) 0); // 文本消息
             } else if (messageData.msgType() == ChatMessageType.COMPOUND) {
-                CompoundMessageContent compoundContent = (CompoundMessageContent) messageData.content();
+                CompoundMessageContent compoundContent = objectMapper.convertValue(messageData.content(), CompoundMessageContent.class);
                 contentMap.put("parts", compoundContent.parts());
                 messageEntity.setContentType((short) 1); // 复合消息
+            } else if (messageData.msgType() == ChatMessageType.FRIEND_REQUEST) {
+                // 处理好友请求消息
+                //Map<String, Object> friendRequestContent = (Map<String, Object>) messageData.content();
+                FriendRequestMessageContent friendRequestContent = objectMapper.convertValue(messageData.content(), FriendRequestMessageContent.class);
+                contentMap.put("isAccepted", friendRequestContent.isAccepted());
+                messageEntity.setContentType((short) 2); // 好友请求消息
             } else {
                 logger.warn("不支持的消息类型: {}", messageData.msgType());
                 return false;
@@ -127,6 +126,9 @@ public class ChatMessageService {
 
             // 7. 转发消息给接收者
             forwardMessageToReceiver(messageData.to(), WebSocketMessage.createChatMessage(updatedMessageData));
+
+            // 8. 转发完整消息给发送者
+            forwardMessageToReceiver(messageData.from(), WebSocketMessage.createChatMessage(updatedMessageData));
 
             return true;
         } catch (Exception e) {
@@ -227,13 +229,13 @@ public class ChatMessageService {
                 ackEntity.setChatId(chatId);
                 ackEntity.setUserId(userId);
                 ackEntity.setLastMessageId(lastMessageId);
-                privateMessageAcknowledgeMapper.insert(ackEntity);
+                checkResult(privateMessageAcknowledgeMapper.insert(ackEntity));
             } else {
                 // 已存在记录，更新last_message_id
                 // 只有当新的lastMessageId大于现有的lastMessageId时才更新
                 if (lastMessageId > ackEntity.getLastMessageId()) {
                     ackEntity.setLastMessageId(lastMessageId);
-                    privateMessageAcknowledgeMapper.updateById(ackEntity);
+                    checkResultGreaterThanZero(privateMessageAcknowledgeMapper.update(ackEntity));
                 }
             }
 
@@ -241,6 +243,108 @@ public class ChatMessageService {
         } catch (Exception e) {
             logger.error("处理消息已读请求时出错", e);
             return false;
+        }
+    }
+
+
+    /**
+     * 获取历史消息
+     *
+     * @param userId        请求用户ID
+     * @param chatType      聊天类型
+     * @param lastMessageId 最后一条消息ID，如果为null则获取最新消息
+     * @param limit         消息数量限制
+     * @return 历史消息列表
+     */
+    public List<ChatMessageData<?>> getHistoryMessages(Integer userId, ChatType chatType, Long lastMessageId, int limit) {
+        List<ChatMessageData<?>> result = new ArrayList<>();
+
+        if (chatType == ChatType.PRIVATE) {
+            // 构建查询条件
+            QueryWrapper<PrivateMessageEntity> queryWrapper = new QueryWrapper<>();
+
+            // 查询条件：接收者或发送者是当前用户
+            queryWrapper.and(wrapper -> wrapper
+                .eq("sender_id", userId)
+                .or()
+                .eq("receiver_id", userId));
+
+            // 如果提供了lastMessageId，则获取比这个ID小的消息（更早的消息）
+            if (lastMessageId != null && lastMessageId > 0) {
+                queryWrapper.lt("message_id", lastMessageId);
+            }
+
+            // 按消息ID降序排序，限制返回数量
+            queryWrapper.orderByDesc("message_id").last("LIMIT " + limit);
+
+            // 执行查询
+            List<PrivateMessageEntity> messages = privateMessageMapper.selectList(queryWrapper);
+
+            // 转换为ChatMessageData格式
+            for (PrivateMessageEntity message : messages) {
+                ChatMessageData<?> chatMessageData = convertToChatMessageData(message);
+                if (chatMessageData != null) {
+                    result.add(chatMessageData);
+                }
+            }
+
+            // 反转列表，使消息按时间升序排列
+            Collections.reverse(result);
+        }
+
+        return result;
+    }
+
+    /**
+     * 将PrivateMessageEntity转换为ChatMessageData
+     */
+    private ChatMessageData<?> convertToChatMessageData(PrivateMessageEntity message) {
+        try {
+            ChatMessageType msgType;
+            Object content;
+
+            // 根据contentType确定消息类型和内容
+            switch (message.getContentType()) {
+                case 0: // 文本消息
+                    msgType = ChatMessageType.TEXT;
+                    String text = (String) message.getContent().get("text");
+                    content = new TextMessageContent(text);
+                    break;
+
+                case 1: // 复合消息
+                    msgType = ChatMessageType.COMPOUND;
+//                List<Map<String, Object>> parts = new ArrayList<>() ;//=
+//                    //(List<Map<String, Object>>) message.getContent().get("parts");
+//                content = new CompoundMessageContent(parts);
+                    logger.warn("暂时不支持复合消息");
+                    return null;
+
+                case 2: // 好友请求消息
+                    msgType = ChatMessageType.FRIEND_REQUEST;
+                    Boolean isAccepted = (Boolean) message.getContent().get("isAccepted");
+                    content = new FriendRequestMessageContent(isAccepted != null && isAccepted);
+                    break;
+
+                default:
+                    logger.warn("未知的消息类型: {}", message.getContentType());
+                    return null;
+            }
+
+            // 创建ChatMessageData对象
+            return new ChatMessageData<>(
+                message.getMessageId(),
+                ChatType.PRIVATE,
+                msgType,
+                message.getChatId(),
+                message.getSenderId(),
+                message.getReceiverId(),
+                message.getReplyTo(),
+                content,
+                message.getSentAt()
+            );
+        } catch (Exception e) {
+            logger.error("转换消息格式时出错", e);
+            return null;
         }
     }
 }

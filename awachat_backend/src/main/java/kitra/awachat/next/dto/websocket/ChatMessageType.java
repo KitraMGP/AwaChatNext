@@ -4,7 +4,8 @@ import com.fasterxml.jackson.annotation.JsonValue;
 
 public enum ChatMessageType {
     TEXT("text"),
-    COMPOUND("compound");
+    COMPOUND("compound"),
+    FRIEND_REQUEST("friend_request");
 
     private final String value;
 

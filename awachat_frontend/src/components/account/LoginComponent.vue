@@ -4,7 +4,7 @@ import router from '@/router';
 import { checkSuccessful, getErrorMsg, showFailMessage, showSuccessfulMessage } from '@/services/api';
 import { loginApi } from '@/services/userApi';
 import { useUserDataStore } from '@/stores/userDataStore';
-import { ElNotification, type FormRules } from 'element-plus';
+import { ElMessage, type FormRules } from 'element-plus';
 import { reactive, ref, watch } from 'vue';
 
 const form = reactive({
@@ -17,8 +17,8 @@ const userDataStore = useUserDataStore()
 // 检测用户是否已登录，若已登录则回到上一页
 watch(userDataStore, (newValue) => {
   if (newValue.value != null) {
-    ElNotification({
-      title: "您已登录",
+    ElMessage({
+      message: "您已登录",
       type: "info",
       duration: 2000
     })

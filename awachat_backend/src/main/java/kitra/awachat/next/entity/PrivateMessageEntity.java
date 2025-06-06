@@ -24,6 +24,9 @@ public class PrivateMessageEntity {
     @TableField(value = "content", typeHandler = JsonbTypeHandler.class)
     private Map<String, Object> content;
 
+    /**
+     * 0 为普通文本消息，1 为复合消息，2 为好友请求消息
+     */
     @TableField("content_type")
     private Short contentType;
 

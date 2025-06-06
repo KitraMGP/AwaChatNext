@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kitra.awachat.next.mapper.PrivateMessageAcknowledgeMapper">
+    <update id="update" parameterType="kitra.awachat.next.entity.PrivateMessageAcknowledgeEntity">
+        UPDATE private_message_acknowledge
+        SET last_message_id = #{lastMessageId}
+        WHERE chat_id = #{chatId}
+          AND user_id = #{userId}
+    </update>
+
+</mapper>

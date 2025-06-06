@@ -6,4 +6,5 @@ import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
 public interface PrivateMessageAcknowledgeMapper extends BaseMapper<PrivateMessageAcknowledgeEntity> {
+    int update(PrivateMessageAcknowledgeEntity newMessage);
 }

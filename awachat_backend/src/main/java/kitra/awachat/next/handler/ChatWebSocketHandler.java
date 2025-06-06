@@ -2,13 +2,11 @@ package kitra.awachat.next.handler;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import kitra.awachat.next.dto.websocket.ChatMessageData;
-import kitra.awachat.next.dto.websocket.HeartbeatData;
-import kitra.awachat.next.dto.websocket.ReadAcknowledgeData;
-import kitra.awachat.next.dto.websocket.WebSocketMessage;
+import kitra.awachat.next.dto.websocket.*;
 import kitra.awachat.next.entity.PrivateChatEntity;
 import kitra.awachat.next.service.ChatMessageService;
 import kitra.awachat.next.service.ChatService;
+import kitra.awachat.next.service.FriendService;
 import kitra.awachat.next.session.WebSocketSessionManager;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -19,9 +17,10 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
- * Handler 用于对连接的建立、断开和消息的接收进行响应
+ * Handler 用于对连接的建立、断开和消息的接收进行响应，处理所有的 WebSocket 请求
  */
 @Component
 public class ChatWebSocketHandler extends TextWebSocketHandler {
@@ -29,13 +28,16 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     private final WebSocketSessionManager sessionManager;
     private final ChatMessageService chatMessageService;
     private final ChatService chatService;
+    private final FriendService friendService;
     private final ObjectMapper objectMapper;
     private final Logger logger = LogManager.getLogger(ChatWebSocketHandler.class);
 
-    public ChatWebSocketHandler(WebSocketSessionManager sessionManager, ChatMessageService chatMessageService, ChatService chatService) {
+    public ChatWebSocketHandler(WebSocketSessionManager sessionManager, ChatMessageService chatMessageService,
+                                ChatService chatService, FriendService friendService) {
         this.sessionManager = sessionManager;
         this.chatMessageService = chatMessageService;
         this.chatService = chatService;
+        this.friendService = friendService;
         this.objectMapper = new ObjectMapper();
     }
 
@@ -93,6 +95,9 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 case WebSocketMessage.TYPE_ACK:
                     handleAcknowledgeMessage(userId, webSocketMessage, session);
                     break;
+                case WebSocketMessage.TYPE_REQUEST_CHAT_HISTORY:
+                    handleRequestChatHistory(userId, webSocketMessage, session);
+                    break;
                 default:
                     logger.warn("不支持的消息类型：{}", messageType);
                     sendErrorMessage(session, "不支持的消息类型：" + messageType);
@@ -107,43 +112,83 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
+     * 处理用户拉取聊天历史的请求
+     */
+    private void handleRequestChatHistory(Integer userId, WebSocketMessage<?> webSocketMessage, WebSocketSession session) {
+        try {
+            // 将data部分转换为RequestChatHistoryData
+            RequestChatHistoryData requestData = objectMapper.convertValue(webSocketMessage.data(), RequestChatHistoryData.class);
+
+            // 获取历史消息
+            List<ChatMessageData<?>> historyMessages = chatMessageService.getHistoryMessages(
+                userId,
+                requestData.chatType(),
+                requestData.lastMessageId(),
+                20 // 每次获取20条消息
+            );
+
+            ChatHistoryData chatHistoryData = new ChatHistoryData(historyMessages.toArray(new ChatMessageData[0]));
+
+            // 发送历史消息给客户端
+            WebSocketMessage<ChatHistoryData> response =
+                new WebSocketMessage<>(WebSocketMessage.TYPE_REQUEST_CHAT_HISTORY, chatHistoryData);
+
+            session.sendMessage(new TextMessage(objectMapper.writeValueAsString(response)));
+
+        } catch (Exception e) {
+            logger.error("处理历史消息请求时出错", e);
+            sendErrorMessage(session, "获取历史消息失败");
+        }
+    }
+
+    /**
      * 处理聊天消息
      */
     private void handleChatMessage(Integer userId, WebSocketMessage<?> message, WebSocketSession session) {
         try {
             // 将data部分转换为ChatMessageData
             ChatMessageData<?> chatMessageData = objectMapper.convertValue(message.data(), ChatMessageData.class);
-    
+
             // 1. 验证发送者ID是否匹配
             if (!userId.equals(chatMessageData.from())) {
                 logger.warn("消息发送者ID不匹配: {} vs {}", userId, chatMessageData.from());
                 sendErrorMessage(session, "消息发送者ID不匹配");
                 return;
             }
-    
-            // 2. 检查chatId，如果为0则创建新会话
-            Long chatId = chatMessageData.chatId();
-            if (chatId == 0) {
-                // 创建或获取私聊会话
-                PrivateChatEntity chatEntity = chatService.createOrGetPrivateChat(chatMessageData.from(), chatMessageData.to());
-                
-                // 更新chatId
-                chatMessageData = new ChatMessageData<>(
-                    chatMessageData.id(),
-                    chatMessageData.chatType(),
-                    chatMessageData.msgType(),
-                    chatEntity.getChatId(),  // 使用新的chatId
-                    chatMessageData.from(),
-                    chatMessageData.to(),
-                    chatMessageData.replyTo(),
-                    chatMessageData.content(),
-                    chatMessageData.sentAt()
-                );
+
+            // 2. 检查两人是否是好友
+            boolean areFriends = friendService.areFriends(chatMessageData.from(), chatMessageData.to());
+
+            // 如果不是好友，只允许发送好友请求消息
+            if (!areFriends && chatMessageData.msgType() != ChatMessageType.FRIEND_REQUEST) {
+                logger.warn("非好友关系，不允许发送普通消息: 从 {} 到 {}", chatMessageData.from(), chatMessageData.to());
+                sendErrorMessage(session, "您还不是对方的好友，请先发送好友请求");
+                return;
             }
-    
-            // 处理聊天消息
+
+            // 3. 检查chatId，如果不存在则创建新会话
+            //Long chatId = chatMessageData.chatId();
+            //if (chatId == 0) {
+            // 创建或获取私聊会话
+            PrivateChatEntity chatEntity = chatService.createOrGetPrivateChat(chatMessageData.from(), chatMessageData.to());
+
+            // 更新chatId
+            chatMessageData = new ChatMessageData<>(
+                0L, // 目前还没有生成消息ID
+                chatMessageData.chatType(),
+                chatMessageData.msgType(),
+                chatEntity.getChatId(),  // 使用新的chatId
+                chatMessageData.from(),
+                chatMessageData.to(),
+                chatMessageData.replyTo(),
+                chatMessageData.content(),
+                chatMessageData.sentAt()
+            );
+            //}
+
+            // 4. 处理聊天消息
             boolean success = chatMessageService.handleChatMessage(userId, chatMessageData);
-    
+
             // 发送处理结果
             if (!success) {
                 sendErrorMessage(session, "消息处理失败");

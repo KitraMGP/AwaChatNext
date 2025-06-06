@@ -11,6 +11,7 @@ export interface UserData {
   lastOnlineAt: string
   role: number
   banUntil: string
+  isFriend?: boolean // 添加isFriend字段，表示是否为好友
   extendedData: object
 }
 
@@ -32,4 +33,8 @@ export interface LoginResponse {
 
 export interface LogoutResponse {
   satoken: string
+}
+
+export interface AcceptFriendRequestRequest {
+  originUserId: number
 }

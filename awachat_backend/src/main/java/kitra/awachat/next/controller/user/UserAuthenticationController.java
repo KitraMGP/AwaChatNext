@@ -31,7 +31,7 @@ public class UserAuthenticationController {
     public ApiResponse<LoginResponse> login(@RequestBody @Valid LoginRequest loginRequest) {
         UserEntity userEntity = userService.login(loginRequest.username(), loginRequest.password());
         StpUtil.login(userEntity.getUserId());
-        UserDataResponse userData = new UserDataResponse(userEntity.getUserId(), userEntity.getUsername(), userEntity.getNickname(), userEntity.getDescription(), userEntity.getAvatar(), userEntity.getCreatedAt(), userEntity.getLastOnlineAt(), userEntity.getRole(), userEntity.getBanUntil(), userEntity.getExtendedData());
+        UserDataResponse userData = new UserDataResponse(userEntity.getUserId(), userEntity.getUsername(), userEntity.getNickname(), userEntity.getDescription(), userEntity.getAvatar(), userEntity.getCreatedAt(), userEntity.getLastOnlineAt(), userEntity.getRole(), userEntity.getBanUntil(), false, userEntity.getExtendedData());
         return ApiUtil.successfulResponse(new LoginResponse(userData, StpUtil.getTokenValue()));
     }
 
