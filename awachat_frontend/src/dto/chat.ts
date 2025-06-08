@@ -35,7 +35,7 @@ export interface ChatListResponse {
 /**
  * 用于显示在UI上的会话信息
  */
-export interface DisplayConversation {
+export interface DisplayChat {
   id: number
   name: string
   lastMessage: string

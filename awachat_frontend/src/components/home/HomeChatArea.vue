@@ -4,25 +4,25 @@ import { useUserDataStore } from '@/stores/userDataStore'
 import { websocketService } from '@/services/websocketService'
 import { ChatType, ChatMessageType, type ChatMessageData, type WebSocketMessage, type RequestChatHistoryData, type ReadAcknowledgeData, MESSAGE_TYPE, type ChatHistoryData, type CompoundMessageContent, type FriendRequestMessageContent, type TextMessageContent } from '@/dto/websocket'
 import type { ChatInfo, PrivateChatInfo } from '@/dto/chat';
-import Loading from 'element-plus/es/components/loading/src/service.mjs';
 import { acceptFriendRequestApi } from '@/services/userApi';
 import { dayjs, ElMessage } from 'element-plus';
 
 const props = defineProps<{
-  selectedConversation: number | null,
+  selectedChat: number | null,
   chatInfo: ChatInfo<PrivateChatInfo> | null
 }>()
+const emit = defineEmits(['update_chatlist'])
 
 const userData = useUserDataStore()
 const messages = ref<ChatMessageData[]>([])
 const messageInput = ref('')
-const messagesContainer = ref<HTMLElement | null>(null)
-const isLoadingHistory = ref(false)
+const messagesContainer = ref<HTMLElement | null>(null) // 引用聊天信息区域HTML元素，用于检测滚动位置
+const isLoadingHistory = ref(false) // 决定是否显示加载动画，在拉取历史消息的时候使用（目前功能损坏不能使用，TODO）
 const noMoreMessages = ref(false)
 const oldestMessageId = ref<number | null>(null)
 
-// 监听选中的会话变化
-watch(() => props.selectedConversation, async (newChatId) => {
+// 监听选中的会话切换操作
+watch(() => props.selectedChat, async (newChatId) => {
   if (newChatId !== null) {
     // 清空消息列表和状态
     messages.value = []
@@ -30,17 +30,20 @@ watch(() => props.selectedConversation, async (newChatId) => {
     noMoreMessages.value = false
 
     // 加载最新消息
-    await loadLatestMessages(newChatId)
+    await loadLatestMessages()
   }
-}, { immediate: true })
+}, { immediate: true }) // immediate 设置为 true，可以在监听器创建时立即执行一次操作
 
-// 加载最新消息
-async function loadLatestMessages(chatId: number) {
-  if (!userData.value || !props.selectedConversation) return
-
+/**
+ * 加载最新消息
+ */
+async function loadLatestMessages() {
+  if (!userData.value || !props.selectedChat) return
+  console.log("开始加载最新消息")
+  isLoadingHistory.value = true
   const requestData: RequestChatHistoryData = {
     chatType: ChatType.PRIVATE,
-    chatId: chatId
+    chatId: props.selectedChat
   }
 
   // 发送请求获取历史消息
@@ -52,15 +55,18 @@ async function loadLatestMessages(chatId: number) {
   websocketService.sendMessage(message)
 }
 
-// 加载更早的消息
+/**
+ * 加载历史消息。应在打开会话或滚动到顶部时调用。
+ */
 async function loadEarlierMessages() {
-  if (!props.selectedConversation || isLoadingHistory.value || noMoreMessages.value) return
+  if (!props.selectedChat || isLoadingHistory.value || noMoreMessages.value) return
 
+  console.log("开始加载更早的消息")
   isLoadingHistory.value = true
 
   const requestData: RequestChatHistoryData = {
     chatType: ChatType.PRIVATE,
-    chatId: props.selectedConversation,
+    chatId: props.selectedChat,
     lastMessageId: oldestMessageId.value || undefined
   }
 
@@ -74,27 +80,33 @@ async function loadEarlierMessages() {
 
   // 5秒超时保护
   setTimeout(() => {
-    isLoadingHistory.value = false
+    if (isLoadingHistory.value) {
+      isLoadingHistory.value = false
+    }
   }, 5000)
 }
 
-// 处理滚动事件，检测是否需要加载更多消息
+/**
+ * 滚动事件处理器。当滚动到顶端时，执行加载历史消息操作。
+ */
 function handleScroll(event: Event) {
   const target = event.target as HTMLElement
-  if (target.scrollTop <= 50 && !isLoadingHistory.value && !noMoreMessages.value) {
+  if (target.scrollTop === 0 && !isLoadingHistory.value && !noMoreMessages.value) {
     loadEarlierMessages()
   }
 }
 
-// 发送消息
+/**
+ * 发送输入框中的消息
+ */
 function sendMessage() {
   const recepientId = getRecipientId()
-  if (!messageInput.value.trim() || !props.selectedConversation || !userData.value || !recepientId) return
+  if (!messageInput.value.trim() || !props.selectedChat || !userData.value || !recepientId) return
 
   const chatMessage: ChatMessageData = {
     chatType: ChatType.PRIVATE,
     msgType: ChatMessageType.TEXT,
-    chatId: props.selectedConversation,
+    chatId: props.selectedChat,
     from: userData.value.userId,
     to: recepientId,
     content: { content: messageInput.value.trim() }
@@ -104,7 +116,9 @@ function sendMessage() {
   messageInput.value = ''
 }
 
-// 获取接收者ID
+/**
+ * 获取私聊中消息接收者用户ID
+ */
 function getRecipientId(): number | null {
   if (!props.chatInfo) return null
   return props.chatInfo?.info.userId
@@ -115,19 +129,28 @@ onMounted(() => {
   // 注册历史消息处理器
   // TODO 处理这里的问题
   websocketService.registerMessageHandler(MESSAGE_TYPE.REQUEST_CHAT_HISTORY, (data: ChatHistoryData) => {
+    console.log('正在接收历史消息')
     if (data.history.length === 0) {
+      console.log('已拉取所有历史消息')
       noMoreMessages.value = true
       isLoadingHistory.value = false
       return
     }
 
-    // 保存最早消息的ID（遍历然后取最小值）
-    const earliestMessage = data.history.reduce((prev, curr) =>
-      (curr.id && prev.id && curr.id < prev.id) ? curr : prev, data.history[0])
+    // // 保存最早消息的ID（遍历然后取最小值）
+    // const earliestMessage = data.history.reduce((prev, curr) =>
+    //   (curr.id && prev.id && curr.id < prev.id) ? curr : prev, data.history[0])
 
-    if (earliestMessage && earliestMessage.id) {
-      oldestMessageId.value = earliestMessage.id
+    // if (earliestMessage && earliestMessage.id) {
+    //   oldestMessageId.value = earliestMessage.id
+    // }
+
+    // 更新最早消息ID
+    if (!data.history[0].id) {
+      isLoadingHistory.value = false
+      return
     }
+    oldestMessageId.value = data.history[0].id
 
     // 将新消息添加到列表开头
     const scrollHeight = messagesContainer.value?.scrollHeight
@@ -137,12 +160,14 @@ onMounted(() => {
 
     // 维持滚动位置
     nextTick(() => {
-      if (messagesContainer.value && scrollHeight && scrollTop) {
+      if (messagesContainer.value && scrollHeight !== undefined && scrollTop !== undefined) {
         const newScrollHeight = messagesContainer.value.scrollHeight
         messagesContainer.value.scrollTop = scrollTop + (newScrollHeight - scrollHeight)
       }
-      isLoadingHistory.value = false
+      console.log('已接收并处理历史消息')
     })
+
+    isLoadingHistory.value = false
 
     // 发送已读回执
     sendReadAcknowledge()
@@ -150,8 +175,8 @@ onMounted(() => {
 
   // 注册聊天消息处理器
   websocketService.registerMessageHandler(MESSAGE_TYPE.CHAT, (data: ChatMessageData) => {
-    // 只处理当前会话的消息
-    if (data.chatId === props.selectedConversation) {
+    // 处理当前会话的消息
+    if (data.chatId === props.selectedChat) {
       messages.value.push(data)
 
       // 滚动到底部
@@ -164,12 +189,19 @@ onMounted(() => {
       // 发送已读回执
       sendReadAcknowledge()
     }
+
+    // 更新会话列表中的数据
+    // TODO 更新会话列表
+    // 将收到的消息发送给父组件，通知其更新会话列表
+    emit('update_chatlist', data)
   })
 })
 
-// 发送已读回执
+/**
+ * 发送已读回执（将前端获取到的最新的消息ID告知后端）
+ */
 function sendReadAcknowledge() {
-  if (!props.selectedConversation || messages.value.length === 0) return
+  if (!props.selectedChat || messages.value.length === 0) return
 
   // 获取最新消息的ID
   const latestMessage = messages.value[messages.value.length - 1]
@@ -179,7 +211,7 @@ function sendReadAcknowledge() {
     type: MESSAGE_TYPE.ACK,
     data: {
       chatType: ChatType.PRIVATE,
-      chatId: props.selectedConversation,
+      chatId: props.selectedChat,
       lastMessageId: latestMessage.id
     }
   }
@@ -187,12 +219,18 @@ function sendReadAcknowledge() {
   websocketService.sendMessage(ackMessage)
 }
 
-// 判断消息是否由当前用户发送
+/**
+ * 判断消息是否为用户发送的，用于前端渲染
+ * @param message 消息数据
+ */
 function isOwnMessage(message: ChatMessageData): boolean {
   return message.from === userData.value?.userId
 }
 
-// 接受好友请求
+/**
+ * 接受好友请求（告知后端已接受好友请求）
+ * @param from 发出好友请求的用户ID
+ */
 async function acceptFriendRequest(from: number) {
   try {
     const resp = await acceptFriendRequestApi({ originUserId: from })
@@ -217,10 +255,10 @@ async function acceptFriendRequest(from: number) {
   }
 }
 
-// 格式化消息时间
-function formatMessageTime(date: string | Date): string {
-  if (!date) return ''
-  //const messageDate = typeof date === 'string' ? new Date(date) : date
+/**
+ * 对日期进行格式化
+ */
+function formatMessageTime(date: string): string {
   return dayjs(date).format('L LT')
 }
 </script>
@@ -228,14 +266,10 @@ function formatMessageTime(date: string | Date): string {
 <template>
   <!-- 右侧聊天界面 -->
   <div class="chat-area">
-    <template v-if="props.selectedConversation !== null">
+    <template v-if="props.selectedChat !== null">
       <!-- 聊天消息区域 -->
       <div class="chat-messages" ref="messagesContainer" @scroll="handleScroll">
-        <div v-if="isLoadingHistory" class="loading-history">
-          <el-icon class="is-loading">
-            <Loading />
-          </el-icon> 加载更多消息...
-        </div>
+
         <div v-if="noMoreMessages" class="no-more-messages">
           没有更多消息了
         </div>
@@ -265,7 +299,7 @@ function formatMessageTime(date: string | Date): string {
                     你们已经成为好友
                   </div>
                   <div v-else>
-                    <div>收到好友请求</div>
+                    <div>请求添加你为好友</div>
                     <el-button size="small" type="primary" @click="acceptFriendRequest(message.from)">
                       接受
                     </el-button>
@@ -286,7 +320,7 @@ function formatMessageTime(date: string | Date): string {
               </div>
             </div>
             <div class="message-time">
-              {{ formatMessageTime(message.sentAt || new Date()) }}
+              {{ formatMessageTime(message.sentAt || '') }}
             </div>
           </div>
         </template>

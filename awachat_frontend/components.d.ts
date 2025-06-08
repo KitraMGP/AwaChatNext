@@ -20,7 +20,7 @@ declare module 'vue' {
     ElInput: typeof import('element-plus/es')['ElInput']
     ElLink: typeof import('element-plus/es')['ElLink']
     HomeChatArea: typeof import('./src/components/home/HomeChatArea.vue')['default']
-    HomeConversationList: typeof import('./src/components/home/HomeConversationList.vue')['default']
+    HomeChatList: typeof import('./src/components/home/HomeChatList.vue')['default']
     LoginComponent: typeof import('./src/components/account/LoginComponent.vue')['default']
     RegisterComponent: typeof import('./src/components/account/RegisterComponent.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

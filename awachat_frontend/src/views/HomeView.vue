@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import HomeChatArea from '@/components/home/HomeChatArea.vue';
-import HomeConversationList from '@/components/home/HomeConversationList.vue';
-import type { ChatInfo, DisplayConversation, PrivateChatInfo } from '@/dto/chat';
+import type { ChatInfo, DisplayChat, PrivateChatInfo } from '@/dto/chat';
 import router from '@/router';
 import { chatListApi } from '@/services/chatApi';
 import { getUserInfoApi } from '@/services/userApi';
@@ -9,16 +7,25 @@ import { initWebSocketService } from '@/services/initWebsocket';
 import { useUserDataStore } from '@/stores/userDataStore';
 import { onMounted, ref, watch } from 'vue';
 import { showFailMessage } from '@/services/api';
+import { previewChatMessageData, type ChatMessageData } from '@/dto/websocket';
+import HomeChatArea from '@/components/home/HomeChatArea.vue';
+import HomeChatList from '@/components/home/HomeChatList.vue';
 
 // 会话数据
-const conversations = ref<DisplayConversation[]>([]);
+const chats = ref<DisplayChat[]>([]);
 const chatInfos = ref<ChatInfo<PrivateChatInfo>[]>([])
 
 // 当前选中的会话，添加类型声明
-const selectedConversation = ref<number | null>(null);
+const selectedChatId = ref<number | null>(null);
 
-function handleSelectConversation(select: number) {
-  selectedConversation.value = select;
+/**
+ * 处理消息列表中点击打开会话的逻辑。
+ */
+function handleSelectChat(select: number) {
+  // 选择会话
+  selectedChatId.value = select;
+  // 清空该会话的未读
+  chats.value.filter(chat => chat.id === select).forEach(chat => chat.unread = 0)
 }
 
 const userData = useUserDataStore()
@@ -41,8 +48,8 @@ async function loadChatList() {
 
       // 先存入chatInfo
       chatInfos.value = chatList
-      // 转换为DisplayConversation格式
-      conversations.value = chatList.map((chat, index) => {
+      // 转换为DisplayChat格式
+      chats.value = chatList.map((chat, index) => {
         // 这里只处理私聊类型，群聊类型可以后续扩展
         if (chat.type === 'private') {
           const privateChatInfo = chat.info;
@@ -51,13 +58,13 @@ async function loadChatList() {
           return {
             id: privateChatInfo.chatId || index, // 优先使用chatId，如果为0则使用索引
             name: privateChatInfo.nickname || privateChatInfo.username, // 优先使用昵称，如果没有则使用用户名
-            lastMessage: '暂无消息', // 暂无消息历史
+            lastMessage: privateChatInfo.lastMessageContent, // 暂无消息历史
             time: new Date(privateChatInfo.updatedAt).toLocaleString(), // 格式化时间
-            unread: 0 // 暂无未读消息计数
+            unread: privateChatInfo.unreadCount
           };
         }
         return null;
-      }).filter(Boolean) as DisplayConversation[];
+      }).filter(Boolean) as DisplayChat[];
     }
   } catch (error) {
     console.error('获取聊天列表失败:', error);
@@ -93,18 +100,43 @@ onMounted(async () => {
  * 获取当前选中的会话的信息
  */
 function getCurrentChatInfo(): ChatInfo<PrivateChatInfo> | null {
-  const selectedChat = chatInfos.value.filter((chat) => chat.info.chatId === selectedConversation.value)
-  if (selectedChat.length != 1) return null
-  return selectedChat[0]
+  const selectedChatArray = chatInfos.value.filter((chat) => chat.info.chatId === selectedChatId.value)
+  if (selectedChatArray.length != 1) return null
+  return selectedChatArray[0]
+}
+
+/**
+ * 负责处理HomeChatArea中通过WebSocket接收到的聊天消息。
+ * 用于根据新消息更新会话列表的最新消息预览和未读数量
+ */
+async function onReceivedNewChatMessage(data: ChatMessageData) {
+  // 在会话列表找到与收到消息data相对应的会话
+  const chatsToUpdate = chats.value.filter(chat => chat.id === data.chatId)
+  // 如果没找到对应会话，说明创建了新会话，需要从后端重新拉取会话列表
+  // 这可以修复用户收到好友请求时不会实时显示出来的问题
+  if (chatsToUpdate.length === 0) {
+    await loadChatList()
+    return
+  }
+  // 1. 首先更新最新消息预览
+  chatsToUpdate.forEach(chat => chat.lastMessage = previewChatMessageData(data))
+  // 2. 如果不是当前打开的会话，则其未读消息数量加一
+  chatsToUpdate.forEach(chat => {
+    if (chat.id !== selectedChatId.value) {
+      chat.unread++
+    }
+  })
+  // 上面用forEach可以方便地规避找不到匹配项或找到多个匹配项的问题
 }
 </script>
 
 <template>
   <main class="chat-container">
     <!-- 左侧会话列表 -->
-    <HomeConversationList :conversations="conversations" :selected-conversation="selectedConversation"
-      @select-conversation="handleSelectConversation" />
-    <HomeChatArea :selected-conversation="selectedConversation" :chat-info="getCurrentChatInfo()" />
+    <HomeChatList :chats="chats" :selected-chat-id="selectedChatId" @select-chat="handleSelectChat"
+      @update-chatlist="loadChatList()" />
+    <HomeChatArea :selectedChat="selectedChatId" :chat-info="getCurrentChatInfo()"
+      @update_chatlist="onReceivedNewChatMessage" />
   </main>
 </template>
 

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DisplayConversation } from '@/dto/chat';
+import type { DisplayChat } from '@/dto/chat';
 import SimpleAvatar from '../avatar/SimpleAvatar.vue';
 import { ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
@@ -10,12 +10,12 @@ import { createFriendRequestMessage } from '@/dto/websocket';
 import router from '@/router';
 
 const props = defineProps<{
-  conversations: DisplayConversation[],
-  selectedConversation: number | null
+  chats: DisplayChat[],
+  selectedChatId: number | null
 }>()
 
 const userDataStore = useUserDataStore()
-const emit = defineEmits(["select-conversation"])
+const emit = defineEmits(["select-chat", "update-chatlist"])
 
 // 添加好友对话框
 const addFriendDialogVisible = ref(false);
@@ -125,6 +125,7 @@ async function handleAddFriend() {
         websocketService.sendChatMessage(friendRequestMessage);
 
         ElMessage.success('好友请求已发送');
+        emit('update-chatlist') // 要求重新获取聊天列表，因为这个操作创建了新会话
         addFriendDialogVisible.value = false; // 关闭对话框
       }).catch(() => {
         // 用户取消操作
@@ -140,7 +141,7 @@ async function handleAddFriend() {
 </script>
 
 <template>
-  <div class="conversation-list">
+  <div class="chat">
     <div class="title-bar">
       <h3>会话列表</h3>
       <el-dropdown @command="handleCommand">
@@ -149,6 +150,7 @@ async function handleAddFriend() {
         </span>
         <template #dropdown>
           <el-dropdown-menu>
+            <el-dropdown-item>用户名：{{ userDataStore.value?.username }}</el-dropdown-item>
             <el-dropdown-item command="addFriend">添加好友</el-dropdown-item>
             <el-dropdown-item command="newFriends">新朋友</el-dropdown-item>
             <el-dropdown-item command="createGroup">发起群聊</el-dropdown-item>
@@ -175,9 +177,9 @@ async function handleAddFriend() {
     </el-dialog>
 
     <!-- 会话列表 -->
-    <div class="conversation-items">
-      <div v-for="item in props.conversations" :key="item.id" class="conversation-item"
-        :class="{ 'active': selectedConversation === item.id }" @click="emit('select-conversation', item.id)">
+    <div class="chat-items">
+      <div v-for="item in props.chats" :key="item.id" class="chat-item"
+        :class="{ 'active': selectedChatId === item.id }" @click="emit('select-chat', item.id)">
         <SimpleAvatar :text="item.name" size="medium" />
         <div class="content">
           <div class="name-time">
@@ -196,7 +198,7 @@ async function handleAddFriend() {
 
 <style lang="css" scoped>
 /* 左侧会话列表样式 */
-.conversation-list {
+.chat {
   width: 280px;
   border-right: 1px solid #dcdfe6;
   display: flex;
@@ -234,12 +236,12 @@ async function handleAddFriend() {
   box-shadow: none;
 }
 
-.conversation-items {
+.chat-items {
   flex: 1;
   overflow-y: auto;
 }
 
-.conversation-item {
+.chat-item {
   padding: 12px 15px;
   display: flex;
   align-items: center;
@@ -247,26 +249,13 @@ async function handleAddFriend() {
   transition: background-color 0.3s;
 }
 
-.conversation-item:hover {
+.chat-item:hover {
   background-color: #f5f7fa;
 }
 
-.conversation-item.active {
+.chat-item.active {
   background-color: #ecf5ff;
 }
-
-/* .avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background-color: #409EFF;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  margin-right: 12px;
-} */
 
 .content {
   flex: 1;

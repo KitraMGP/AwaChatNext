@@ -5,8 +5,12 @@
 <mapper namespace="kitra.awachat.next.mapper.PrivateChatMapper">
 
     <insert id="insertPrivateChat" parameterType="kitra.awachat.next.entity.PrivateChatEntity">
-        INSERT INTO private_chat (user1_id, user2_id, created_at, updated_at, last_message_id)
-        VALUES (#{user1Id}, #{user2Id}, #{createdAt}, #{updatedAt}, #{lastMessageId})
+        <!-- 使用selectKey实现获取id并填充进实体中，order=BEFORE确保先执行selectKey，它默认是在插入后执行的 -->
+        <selectKey keyProperty="chatId" resultType="long" order="BEFORE">
+            SELECT nextval('private_chat_seq'::regclass)
+        </selectKey>
+        INSERT INTO private_chat (chat_id, user1_id, user2_id, created_at, updated_at, last_message_id)
+        VALUES (#{chatId}, #{user1Id}, #{user2Id}, #{createdAt}, #{updatedAt}, #{lastMessageId})
     </insert>
 
 </mapper>

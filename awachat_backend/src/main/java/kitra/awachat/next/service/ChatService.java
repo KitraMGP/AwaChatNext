@@ -1,9 +1,11 @@
 package kitra.awachat.next.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import kitra.awachat.next.dto.chat.ChatInfo;
 import kitra.awachat.next.dto.chat.ChatType;
 import kitra.awachat.next.dto.chat.PrivateChatInfo;
+import kitra.awachat.next.dto.websocket.TextMessageContent;
 import kitra.awachat.next.entity.PrivateChatEntity;
 import kitra.awachat.next.entity.PrivateMessageAcknowledgeEntity;
 import kitra.awachat.next.entity.PrivateMessageEntity;
@@ -20,7 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.Map;
 
 import static kitra.awachat.next.util.DataBaseUtil.checkResult;
 
@@ -32,14 +33,16 @@ public class ChatService {
     private final PrivateMessageMapper privateMessageMapper;
     private final PrivateMessageAcknowledgeMapper privateMessageAcknowledgeMapper;
     private final Logger logger = LogManager.getLogger(ChatService.class);
+    private final ObjectMapper objectMapper;
 
     public ChatService(UserMapper userMapper, PrivateChatMapper privateChatMapper,
                        PrivateMessageMapper privateMessageMapper,
-                       PrivateMessageAcknowledgeMapper privateMessageAcknowledgeMapper) {
+                       PrivateMessageAcknowledgeMapper privateMessageAcknowledgeMapper, ObjectMapper objectMapper) {
         this.userMapper = userMapper;
         this.privateChatMapper = privateChatMapper;
         this.privateMessageMapper = privateMessageMapper;
         this.privateMessageAcknowledgeMapper = privateMessageAcknowledgeMapper;
+        this.objectMapper = objectMapper;
     }
 
     public List<ChatInfo<PrivateChatInfo>> getChatList(Integer currentUserId) {
@@ -70,6 +73,16 @@ public class ChatService {
                 PrivateMessageEntity lastMessage = privateMessageMapper.selectById(chatEntity.getLastMessageId());
                 if (lastMessage != null) {
                     lastMessageContent = getMessageContent(lastMessage);
+                }
+            } else { // 若数据库中 lastMessageId 为 null，可能是没有消息或原消息被删
+                // 查询聊天中的最新一条消息
+                QueryWrapper<PrivateMessageEntity> queryWrapper2 = new QueryWrapper<>();
+                queryWrapper2.eq("chat_id", chatEntity.getChatId());
+                queryWrapper2.orderByDesc("message_id").last("limit 1");
+                PrivateMessageEntity privateMessageEntity = privateMessageMapper.selectOne(queryWrapper2);
+                // 若查到了最新消息，则返回最新消息内容
+                if (privateMessageEntity != null) {
+                    lastMessageContent = getMessageContent(privateMessageEntity);
                 }
             }
 
@@ -108,10 +121,8 @@ public class ChatService {
         try {
             // 根据消息类型处理内容
             if (message.getContentType() == 0) { // 文本消息
-                Map<String, Object> content = message.getContent();
-                if (content != null && content.containsKey("content")) {
-                    return content.get("content").toString();
-                }
+                TextMessageContent content = objectMapper.convertValue(message.getContent(), TextMessageContent.class);
+                return content.content();
             } else if (message.getContentType() == 1) { // 复合消息
                 return "[复合消息]";
             } else if (message.getContentType() == 2) { // 好友请求

@@ -1,6 +1,7 @@
 package kitra.awachat.next.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import kitra.awachat.next.dto.websocket.*;
 import kitra.awachat.next.entity.PrivateChatEntity;
@@ -82,20 +83,14 @@ public class ChatMessageService {
             messageEntity.setIsDeleted(false);
 
             // 设置消息内容和类型
-            Map<String, Object> contentMap = new HashMap<>();
+            Map<String, Object> contentMap = objectMapper.convertValue(messageData.content(), new TypeReference<>() {
+            });
+            messageEntity.setContent(contentMap);
             if (messageData.msgType() == ChatMessageType.TEXT) {
-                TextMessageContent textContent = objectMapper.convertValue(messageData.content(), TextMessageContent.class);
-                contentMap.put("text", textContent.content());
                 messageEntity.setContentType((short) 0); // 文本消息
             } else if (messageData.msgType() == ChatMessageType.COMPOUND) {
-                CompoundMessageContent compoundContent = objectMapper.convertValue(messageData.content(), CompoundMessageContent.class);
-                contentMap.put("parts", compoundContent.parts());
                 messageEntity.setContentType((short) 1); // 复合消息
             } else if (messageData.msgType() == ChatMessageType.FRIEND_REQUEST) {
-                // 处理好友请求消息
-                //Map<String, Object> friendRequestContent = (Map<String, Object>) messageData.content();
-                FriendRequestMessageContent friendRequestContent = objectMapper.convertValue(messageData.content(), FriendRequestMessageContent.class);
-                contentMap.put("isAccepted", friendRequestContent.isAccepted());
                 messageEntity.setContentType((short) 2); // 好友请求消息
             } else {
                 logger.warn("不支持的消息类型: {}", messageData.msgType());
@@ -254,7 +249,7 @@ public class ChatMessageService {
      * @param chatType      聊天类型
      * @param lastMessageId 最后一条消息ID，如果为null则获取最新消息
      * @param limit         消息数量限制
-     * @return 历史消息列表
+     * @return 历史消息列表，按照ID升序排列
      */
     public List<ChatMessageData<?>> getHistoryMessages(Integer userId, ChatType chatType, Long lastMessageId, int limit) {
         List<ChatMessageData<?>> result = new ArrayList<>();
@@ -307,22 +302,18 @@ public class ChatMessageService {
             switch (message.getContentType()) {
                 case 0: // 文本消息
                     msgType = ChatMessageType.TEXT;
-                    String text = (String) message.getContent().get("text");
-                    content = new TextMessageContent(text);
+                    content = objectMapper.convertValue(message.getContent(), TextMessageContent.class);
                     break;
 
                 case 1: // 复合消息
                     msgType = ChatMessageType.COMPOUND;
-//                List<Map<String, Object>> parts = new ArrayList<>() ;//=
-//                    //(List<Map<String, Object>>) message.getContent().get("parts");
-//                content = new CompoundMessageContent(parts);
+                    content = objectMapper.convertValue(message.getContent(), CompoundMessageContent.class);
                     logger.warn("暂时不支持复合消息");
-                    return null;
+                    break;
 
                 case 2: // 好友请求消息
                     msgType = ChatMessageType.FRIEND_REQUEST;
-                    Boolean isAccepted = (Boolean) message.getContent().get("isAccepted");
-                    content = new FriendRequestMessageContent(isAccepted != null && isAccepted);
+                    content = objectMapper.convertValue(message.getContent(), CompoundMessageContent.class);
                     break;
 
                 default:

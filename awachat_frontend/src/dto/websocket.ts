@@ -54,6 +54,22 @@ export interface ChatMessageData<
 }
 
 /**
+ * 生成 ChatMessageData 的文字预览。用于消息列表实时更新
+ */
+export function previewChatMessageData(data: ChatMessageData): string {
+  switch (data.msgType) {
+    case 'text':
+      return (data.content as TextMessageContent).content
+    case 'compound':
+      return '[图文消息]'
+    case 'friend_request':
+      return '[好友请求]'
+    default:
+      return '[未知消息类型]'
+  }
+}
+
+/**
  * 创建好友请求消息
  */
 export function createFriendRequestMessage(

@@ -167,8 +167,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             }
 
             // 3. 检查chatId，如果不存在则创建新会话
-            //Long chatId = chatMessageData.chatId();
-            //if (chatId == 0) {
             // 创建或获取私聊会话
             PrivateChatEntity chatEntity = chatService.createOrGetPrivateChat(chatMessageData.from(), chatMessageData.to());
 
@@ -184,7 +182,6 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
                 chatMessageData.content(),
                 chatMessageData.sentAt()
             );
-            //}
 
             // 4. 处理聊天消息
             boolean success = chatMessageService.handleChatMessage(userId, chatMessageData);
