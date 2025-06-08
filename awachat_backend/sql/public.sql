@@ -12,7 +12,7 @@
  Target Server Version : 170005 (170005)
  File Encoding         : 65001
 
- Date: 05/06/2025 20:58:38
+ Date: 09/06/2025 00:59:48
 */
 
 
@@ -79,7 +79,7 @@ COMMENT ON COLUMN "public"."private_chat"."user1_id" IS '用户1 ID';
 COMMENT ON COLUMN "public"."private_chat"."user2_id" IS '用户2 ID';
 COMMENT ON COLUMN "public"."private_chat"."created_at" IS '会话创建时间（有默认值）';
 COMMENT ON COLUMN "public"."private_chat"."updated_at" IS '最后活动时间（有默认值）';
-COMMENT ON COLUMN "public"."private_chat"."last_message_id" IS '最后一条消息ID';
+COMMENT ON COLUMN "public"."private_chat"."last_message_id" IS '最后一条消息ID，若为NULL，需要判断是原消息被删还是没有消息';
 
 -- ----------------------------
 -- Table structure for private_message
@@ -156,12 +156,12 @@ COMMENT ON COLUMN "public"."user"."is_deleted" IS '是否已标记删除（有�
 -- ----------------------------
 -- Alter sequences owned by
 -- ----------------------------
-SELECT setval('"public"."private_chat_seq"', 1, false);
+SELECT setval('"public"."private_chat_seq"', 8, true);
 
 -- ----------------------------
 -- Alter sequences owned by
 -- ----------------------------
-SELECT setval('"public"."private_message_seq"', 1, false);
+SELECT setval('"public"."private_message_seq"', 40, true);
 
 -- ----------------------------
 -- Alter sequences owned by
@@ -217,7 +217,6 @@ ALTER TABLE "public"."private_message" ADD CONSTRAINT "priv_msg_sender_id" FOREI
 -- ----------------------------
 -- Foreign Keys structure for table private_message_acknowledge
 -- ----------------------------
-ALTER TABLE "public"."private_message_acknowledge" ADD CONSTRAINT "last_message_id" FOREIGN KEY ("last_message_id") REFERENCES "public"."private_message" ("message_id") ON DELETE NO ACTION ON UPDATE NO ACTION;
+ALTER TABLE "public"."private_message_acknowledge" ADD CONSTRAINT "last_message_id" FOREIGN KEY ("last_message_id") REFERENCES "public"."private_message" ("message_id") ON DELETE CASCADE ON UPDATE NO ACTION;
 ALTER TABLE "public"."private_message_acknowledge" ADD CONSTRAINT "private_ack_chat_id" FOREIGN KEY ("chat_id") REFERENCES "public"."private_chat" ("chat_id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "public"."private_message_acknowledge" ADD CONSTRAINT "private_ack_user_id" FOREIGN KEY ("user_id") REFERENCES "public"."user" ("user_id") ON DELETE CASCADE ON UPDATE CASCADE;
-COMMENT ON CONSTRAINT "last_message_id" ON "public"."private_message_acknowledge" IS '仅用于比较大小。原消息可能不存在';
