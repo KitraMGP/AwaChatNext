@@ -16,7 +16,6 @@ declare module 'vue' {
     ElDropdownMenu: typeof import('element-plus/es')['ElDropdownMenu']
     ElForm: typeof import('element-plus/es')['ElForm']
     ElFormItem: typeof import('element-plus/es')['ElFormItem']
-    ElIcon: typeof import('element-plus/es')['ElIcon']
     ElInput: typeof import('element-plus/es')['ElInput']
     ElLink: typeof import('element-plus/es')['ElLink']
     HomeChatArea: typeof import('./src/components/home/HomeChatArea.vue')['default']
@@ -26,6 +25,5 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     SimpleAvatar: typeof import('./src/components/avatar/SimpleAvatar.vue')['default']
-    UserInfoDialog: typeof import('./src/components/account/UserInfoDialog.vue')['default']
   }
 }
