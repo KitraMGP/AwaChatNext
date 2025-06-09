@@ -219,6 +219,16 @@ function sendReadAcknowledge() {
   websocketService.sendMessage(ackMessage)
 }
 
+
+/**
+ * 消息输入框按下回车键的处理器。若检测到按下Shift+Enter，则不进行发送。
+ */
+function handleChatInputEnter(event: KeyboardEvent) {
+  if (!event.shiftKey) {
+    sendMessage()
+  }
+}
+
 /**
  * 判断消息是否为用户发送的，用于前端渲染
  * @param message 消息数据
@@ -280,7 +290,7 @@ function formatMessageTime(date: string): string {
           <div class="message" :class="{ 'own-message': isOwnMessage(message) }">
             <div class="message-content">
               <!-- 文本消息 -->
-              <div v-if="message.msgType === ChatMessageType.TEXT" class="text-message">
+              <div v-if="message.msgType === ChatMessageType.TEXT">
                 {{ (message.content as TextMessageContent).content }}
               </div>
 
@@ -329,7 +339,7 @@ function formatMessageTime(date: string): string {
       <!-- 输入区域 -->
       <div class="chat-input">
         <el-input v-model="messageInput" type="textarea" :rows="3" placeholder="请输入消息..."
-          @keyup.enter.ctrl="sendMessage" />
+          @keyup.enter="handleChatInputEnter" />
         <el-button type="primary" @click="sendMessage">发送</el-button>
       </div>
     </template>
@@ -388,6 +398,7 @@ function formatMessageTime(date: string): string {
   padding: 10px 15px;
   border-radius: 10px;
   word-break: break-word;
+  white-space: pre-wrap;
 }
 
 .message-time {
