@@ -124,7 +124,7 @@ public class ChatService {
                 TextMessageContent content = objectMapper.convertValue(message.getContent(), TextMessageContent.class);
                 return content.content();
             } else if (message.getContentType() == 1) { // 复合消息
-                return "[复合消息]";
+                return "[图文消息]";
             } else if (message.getContentType() == 2) { // 好友请求
                 return "[好友请求]";
             }
