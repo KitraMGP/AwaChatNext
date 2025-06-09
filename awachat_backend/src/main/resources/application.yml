@@ -37,6 +37,13 @@ mybatis-plus:
     db-config:
       id-type: none # 禁用全局主键策略，使用 Entity 类中的设置
 
+minio:
+  url: http://127.0.0.1:9090
+  access-key: admin
+  secret-key: 12345678
+  bucket-name: awachatnext-chat-images
+  image-size-limit: 2097152
+
 ############## Sa-Token 配置 (文档: https://sa-token.cc) ##############
 sa-token:
   # token 名称（同时也是 cookie 名称）

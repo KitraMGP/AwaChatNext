@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue'
+import { ref, watch, onMounted, nextTick, reactive } from 'vue'
 import { useUserDataStore } from '@/stores/userDataStore'
 import { websocketService } from '@/services/websocketService'
-import { ChatType, ChatMessageType, type ChatMessageData, type WebSocketMessage, type RequestChatHistoryData, type ReadAcknowledgeData, MESSAGE_TYPE, type ChatHistoryData, type CompoundMessageContent, type FriendRequestMessageContent, type TextMessageContent } from '@/dto/websocket'
+import { ChatType, ChatMessageType, type ChatMessageData, type WebSocketMessage, type RequestChatHistoryData, type ReadAcknowledgeData, MESSAGE_TYPE, type ChatHistoryData, type CompoundMessageContent, type FriendRequestMessageContent, type TextMessageContent, type CompoundMessagePart, CompoundMessagePartType } from '@/dto/websocket'
 import type { ChatInfo, PrivateChatInfo } from '@/dto/chat';
 import { acceptFriendRequestApi } from '@/services/userApi';
 import { dayjs, ElMessage } from 'element-plus';
+import { getImageUploadUrlApi, getImageDownloadUrlApi } from '@/services/imageApi';
 
 const props = defineProps<{
   selectedChat: number | null,
@@ -20,6 +21,9 @@ const messagesContainer = ref<HTMLElement | null>(null) // 引用聊天信息区
 const isLoadingHistory = ref(false) // 决定是否显示加载动画，在拉取历史消息的时候使用（目前功能损坏不能使用，TODO）
 const noMoreMessages = ref(false)
 const oldestMessageId = ref<number | null>(null)
+
+const editor = ref<HTMLElement | null>(null) // 引用消息输入区HTML元素
+const messageParts = ref<CompoundMessagePart[]>([]) // 消息输入区的消息部件列表
 
 // 监听选中的会话切换操作
 watch(() => props.selectedChat, async (newChatId) => {
@@ -94,26 +98,6 @@ function handleScroll(event: Event) {
   if (target.scrollTop === 0 && !isLoadingHistory.value && !noMoreMessages.value) {
     loadEarlierMessages()
   }
-}
-
-/**
- * 发送输入框中的消息
- */
-function sendMessage() {
-  const recepientId = getRecipientId()
-  if (!messageInput.value.trim() || !props.selectedChat || !userData.value || !recepientId) return
-
-  const chatMessage: ChatMessageData = {
-    chatType: ChatType.PRIVATE,
-    msgType: ChatMessageType.TEXT,
-    chatId: props.selectedChat,
-    from: userData.value.userId,
-    to: recepientId,
-    content: { content: messageInput.value.trim() }
-  }
-
-  websocketService.sendChatMessage(chatMessage)
-  messageInput.value = ''
 }
 
 /**
@@ -230,6 +214,234 @@ function handleChatInputEnter(event: KeyboardEvent) {
 }
 
 /**
+ * 将图片上传到MinIO
+ * @param file 要上传的图片文件
+ * @returns 上传成功后的图片路径(key)
+ */
+async function uploadImageToMinio(file: File): Promise<string | null> {
+  if (!props.selectedChat) {
+    ElMessage.error('请先选择一个聊天')
+    return null
+  }
+
+  try {
+    // 1. 获取上传链接
+    const uploadUrlResponse = await getImageUploadUrlApi({
+      chatId: props.selectedChat,
+      fileSize: file.size,
+      mimeType: file.type
+    })
+
+    if (uploadUrlResponse.data.code !== 200) {
+      ElMessage.error(`获取上传链接失败: ${uploadUrlResponse.data.msg}`)
+      return null
+    }
+
+    const { url, key } = uploadUrlResponse.data.data
+
+    // 2. 上传图片到MinIO
+    const uploadResponse = await fetch(url, {
+      method: 'PUT',
+      body: file,
+      headers: {
+        'Content-Type': file.type
+      }
+    })
+
+    if (!uploadResponse.ok) {
+      ElMessage.error(`上传图片失败: ${uploadResponse.statusText}`)
+      return null
+    }
+
+    return key
+  } catch (error) {
+    console.error('上传图片错误:', error)
+    ElMessage.error('上传图片失败，请重试')
+    return null
+  }
+}
+
+/**
+ * 处理编辑器输入事件，解析编辑区内容并更新messageParts
+ */
+function handleInput() {
+  if (!editor.value) return
+
+  const newParts: CompoundMessagePart[] = []
+
+  // 遍历编辑器中的所有节点
+  editor.value.childNodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      // 处理文本节点
+      const text = node.textContent?.trim()
+      if (text) {
+        newParts.push({
+          type: CompoundMessagePartType.TEXT,
+          content: text
+        })
+      }
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      const element = node as HTMLElement
+
+      // 处理图片元素
+      if (element.tagName === 'IMG') {
+        const imgElement = element as HTMLImageElement
+        const src = imgElement.getAttribute('data-key')
+        if (src) {
+          newParts.push({
+            type: CompoundMessagePartType.IMAGE,
+            content: src
+          })
+        }
+      } else if (element.tagName === 'BR') {
+        // 处理换行
+        newParts.push({
+          type: CompoundMessagePartType.TEXT,
+          content: '\n'
+        })
+      } else {
+        // 处理其他元素内的文本
+        const text = element.textContent?.trim()
+        if (text) {
+          newParts.push({
+            type: CompoundMessagePartType.TEXT,
+            content: text
+          })
+        }
+      }
+    }
+  })
+
+  // 合并连续的文本部分
+  const mergedParts: CompoundMessagePart[] = []
+  for (const part of newParts) {
+    if (part.type === CompoundMessagePartType.TEXT &&
+      mergedParts.length > 0 &&
+      mergedParts[mergedParts.length - 1].type === CompoundMessagePartType.TEXT) {
+      // 合并连续的文本
+      mergedParts[mergedParts.length - 1].content += part.content
+    } else {
+      mergedParts.push(part)
+    }
+  }
+
+  // 更新消息部件列表
+  messageParts.value = mergedParts
+}
+
+/**
+ * 插入图片到编辑区
+ */
+async function insertImage(image: File) {
+  if (!editor.value) return
+
+  // 显示上传中的占位图
+  const placeholder = document.createElement('img')
+  placeholder.src = URL.createObjectURL(image)
+  placeholder.style.maxWidth = '200px'
+  placeholder.style.maxHeight = '200px'
+  placeholder.style.opacity = '0.5' // 半透明表示正在上传
+  editor.value.appendChild(placeholder)
+
+  // 上传图片到MinIO
+  const key = await uploadImageToMinio(image)
+
+  if (key) {
+    // 上传成功，更新图片元素
+    placeholder.style.opacity = '1'
+    placeholder.setAttribute('data-key', key)
+
+    // 触发输入事件更新messageParts
+    handleInput()
+  } else {
+    // 上传失败，移除占位图
+    placeholder.remove()
+  }
+}
+
+/**
+ * 处理编辑器粘贴图片事件
+ */
+async function handlePaste(e: ClipboardEvent) {
+  if (!e.clipboardData || !editor.value) return
+
+  // 阻止默认粘贴行为
+  e.preventDefault()
+
+  const items = e.clipboardData.items
+  let hasHandledItem = false
+
+  for (const item of items) {
+    // 处理粘贴的图片
+    if (item.type.startsWith('image/')) {
+      hasHandledItem = true
+      const file = item.getAsFile()
+      if (file) {
+        await insertImage(file)
+      }
+    }
+  }
+
+  // 如果没有处理任何图片，则作为文本粘贴
+  if (!hasHandledItem) {
+    const text = e.clipboardData.getData('text/plain')
+    if (text) {
+      document.execCommand('insertText', false, text)
+    }
+  }
+}
+
+// 修改sendMessage函数，支持发送复合消息
+function sendMessage() {
+  const recepientId = getRecipientId()
+  if (!props.selectedChat || !userData.value || !recepientId) return
+
+  // 确保消息不为空
+  if (messageParts.value.length === 0) {
+    const textContent = editor.value?.textContent?.trim()
+    if (!textContent) return
+
+    // 如果只有纯文本，创建文本消息部件
+    messageParts.value = [{
+      type: CompoundMessagePartType.TEXT,
+      content: textContent
+    }]
+  }
+
+  // 如果只有一个文本部件，使用普通文本消息
+  if (messageParts.value.length === 1 && messageParts.value[0].type === CompoundMessagePartType.TEXT) {
+    const chatMessage: ChatMessageData = {
+      chatType: ChatType.PRIVATE,
+      msgType: ChatMessageType.TEXT,
+      chatId: props.selectedChat,
+      from: userData.value.userId,
+      to: recepientId,
+      content: { content: messageParts.value[0].content }
+    }
+
+    websocketService.sendChatMessage(chatMessage)
+  } else {
+    // 否则使用复合消息
+    const chatMessage: ChatMessageData<CompoundMessageContent> = {
+      chatType: ChatType.PRIVATE,
+      msgType: ChatMessageType.COMPOUND,
+      chatId: props.selectedChat,
+      from: userData.value.userId,
+      to: recepientId,
+      content: { parts: messageParts.value }
+    }
+
+    websocketService.sendChatMessage(chatMessage)
+  }
+
+  // 清空编辑区和消息部件
+  if (editor.value) {
+    editor.value.innerHTML = ''
+  }
+  messageParts.value = []
+}
+
+/**
  * 判断消息是否为用户发送的，用于前端渲染
  * @param message 消息数据
  */
@@ -275,6 +487,43 @@ async function acceptFriendRequest(from: number) {
  */
 function formatMessageTime(date: string): string {
   return dayjs(date).format('L LT')
+}
+
+// 图片URL映射，键为图片路径，值为下载链接
+const imageUrlMap = reactive<Record<string, string>>({});
+
+/**
+ * 获取图片的下载链接
+ * @param path 图片在MinIO中的路径
+ * @returns 图片的下载链接或占位图
+ */
+function getImageUrl(path: string): string {
+  // 如果已经有链接，直接返回
+  if (imageUrlMap[path]) {
+    return imageUrlMap[path];
+  }
+
+  // 设置占位图
+  imageUrlMap[path] = 'data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%22100%22%3E%3Crect%20fill%3D%22%23f2f2f2%22%20width%3D%22100%22%20height%3D%22100%22%2F%3E%3C%2Fsvg%3E';
+
+  // 异步获取图片下载链接
+  getImageDownloadUrlApi(path).then(response => {
+    if (response.data.code === 200) {
+      // 更新链接，由于imageUrlMap是响应式的，视图会自动更新
+      imageUrlMap[path] = response.data.data.url;
+
+      // 设置定时器，在链接过期前一分钟刷新
+      setTimeout(() => {
+        delete imageUrlMap[path]; // 删除过期链接，下次访问时会重新获取
+      }, 4 * 60 * 1000); // 假设链接有效期为5分钟，提前1分钟刷新
+    } else {
+      console.error('获取图片下载链接失败:', response.data.msg);
+    }
+  }).catch(error => {
+    console.error('获取图片下载链接错误:', error);
+  });
+
+  return imageUrlMap[path];
 }
 </script>
 
@@ -329,7 +578,7 @@ function formatMessageTime(date: string): string {
                     {{ part.content }}
                   </div>
                   <div v-else-if="part.type === 'image'" class="image-part">
-                    <img :src="part.content" alt="图片" />
+                    <img :src="getImageUrl(part.content)" alt="图片" />
                   </div>
                 </div>
               </div>
@@ -343,8 +592,10 @@ function formatMessageTime(date: string): string {
 
       <!-- 输入区域 -->
       <div class="chat-input">
-        <el-input v-model="messageInput" type="textarea" :rows="3" placeholder="请输入消息..."
-          @keyup.enter="handleChatInputEnter" />
+        <div class="editor-container">
+          <div ref="editor" contenteditable="true" @input="handleInput" @paste="handlePaste" class="editor"
+            @keyup.enter="handleChatInputEnter"></div>
+        </div>
         <el-button type="primary" @click="sendMessage">发送</el-button>
       </div>
     </template>
@@ -448,5 +699,33 @@ function formatMessageTime(date: string): string {
   padding: 5px;
   border-radius: 5px;
   margin-top: 5px;
+}
+
+.editor-container {
+  position: relative;
+  flex: 1;
+  margin-right: 10px;
+}
+
+.editor {
+  width: 100%;
+  min-height: 60px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid var(--el-border-color);
+  border-radius: 4px;
+  padding: 8px 40px 8px 8px;
+  background-color: var(--el-fill-color-blank);
+}
+
+.editor:focus {
+  outline: none;
+  border-color: var(--el-color-primary);
+}
+
+.image-part img {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 4px;
 }
 </style>

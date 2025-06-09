@@ -322,7 +322,6 @@ public class ChatMessageService {
                 case 1: // 复合消息
                     msgType = ChatMessageType.COMPOUND;
                     content = objectMapper.convertValue(message.getContent(), CompoundMessageContent.class);
-                    logger.warn("暂时不支持复合消息");
                     break;
 
                 case 2: // 好友请求消息

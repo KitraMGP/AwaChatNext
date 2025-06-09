@@ -43,6 +43,8 @@ dependencies {
 	implementation 'org.mindrot:jbcrypt:0.4'
 	// PostgreSQL 驱动
 	implementation 'org.postgresql:postgresql:42.7.6'
+	// MinIO Java SDK
+	implementation 'io.minio:minio:8.5.17'
 	implementation 'com.fasterxml.jackson.core:jackson-databind'
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
