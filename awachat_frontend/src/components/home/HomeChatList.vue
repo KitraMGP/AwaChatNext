@@ -8,6 +8,7 @@ import { useUserDataStore } from '@/stores/userDataStore';
 import { websocketService } from '@/services/websocketService';
 import { createFriendRequestMessage } from '@/dto/websocket';
 import router from '@/router';
+import { toggleDark } from '@/main';
 
 const props = defineProps<{
   chats: DisplayChat[],
@@ -32,6 +33,8 @@ function handleCommand(command: string): void {
     usernameInput.value = ''; // 清空输入框
   } else if (command === 'profile') {
     emit('show-user-info-dialog', userDataStore.value?.userId)
+  } else if (command === 'themeSwitch') {
+    toggleDark()
   } else if (command === 'logout') {
     logout()
   }
@@ -155,7 +158,8 @@ async function handleAddFriend() {
             <el-dropdown-item>用户名：{{ userDataStore.value?.username }}</el-dropdown-item>
             <el-dropdown-item command="addFriend">添加好友</el-dropdown-item>
             <el-dropdown-item command="profile">个人信息</el-dropdown-item>
-            <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
+            <el-dropdown-item command="themeSwitch" divided>主题切换</el-dropdown-item>
+            <el-dropdown-item command="logout">退出登录</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
@@ -200,10 +204,11 @@ async function handleAddFriend() {
 /* 左侧会话列表样式 */
 .chat {
   width: 280px;
-  border-right: 1px solid #dcdfe6;
+  color: var(--el-text-color-primary);
+  border-right: 1px solid var(--el-border-color);
   display: flex;
   flex-direction: column;
-  background-color: #fff;
+  background-color: var(--el-bg-color);
 }
 
 .title-bar {
@@ -211,7 +216,7 @@ async function handleAddFriend() {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #ebeef5;
+  border-bottom: 1px solid --el-border-color;
 }
 
 .title-bar h3 {
@@ -250,11 +255,11 @@ async function handleAddFriend() {
 }
 
 .chat-item:hover {
-  background-color: #f5f7fa;
+  background-color: var(--el-color-primary-light-8);
 }
 
 .chat-item.active {
-  background-color: #ecf5ff;
+  background-color: var(--el-color-primary-light-7);
 }
 
 .content {
@@ -270,7 +275,7 @@ async function handleAddFriend() {
 
 .name {
   font-weight: bold;
-  color: #303133;
+  color: var(--el-text-color-primary);
 }
 
 .time {
@@ -285,7 +290,7 @@ async function handleAddFriend() {
 }
 
 .message {
-  color: #606266;
+  color: var(--el-text-color-regular);
   font-size: 13px;
   white-space: nowrap;
   overflow: hidden;

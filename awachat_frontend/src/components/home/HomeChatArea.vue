@@ -368,7 +368,7 @@ function formatMessageTime(date: string): string {
   align-items: center;
   justify-content: center;
   height: 100%;
-  background-color: #f5f7fa;
+  background-color: var(--el-bg-color-page);
   color: #909399;
   font-size: 16px;
 }
@@ -381,7 +381,7 @@ function formatMessageTime(date: string): string {
 
 .chat-input {
   padding: 10px;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid var(--el-border-color-darker);
   display: flex;
   align-items: flex-end;
 }
@@ -428,8 +428,8 @@ function formatMessageTime(date: string): string {
 }
 
 .message:not(.own-message) .message-content {
-  background-color: #dee4e4;
-  color: #303133;
+  background-color: var(--el-color-info-light-7);
+  color: var(--el-text-color-regular);
 }
 
 /* 加载历史消息提示 */

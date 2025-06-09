@@ -221,7 +221,7 @@ async function deleteFriend(userId: number) {
 .chat-container {
   display: flex;
   height: 100vh;
-  background-color: #f5f7fa;
-  color: #333;
+  background-color: var(--el-bg-color);
+  color: var(--el-text-color-regular);
 }
 </style>
