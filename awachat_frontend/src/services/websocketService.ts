@@ -211,8 +211,8 @@ class WebSocketService {
    * @param messageType 消息类型
    * @param handler 处理函数
    */
-  public registerMessageHandler(messageType: string, handler: (data: unknown) => void): void {
-    this.messageHandlers.set(messageType, handler)
+  public registerMessageHandler<T>(messageType: string, handler: (data: T) => void): void {
+    this.messageHandlers.set(messageType, handler as (data: unknown) => void)
   }
 
   /**
