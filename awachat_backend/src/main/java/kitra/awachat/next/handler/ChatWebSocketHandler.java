@@ -113,6 +113,8 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
 
     /**
      * 处理用户拉取聊天历史的请求
+     *
+     * @param userId 发出请求的用户ID，用来验证用户是否在这个聊天中
      */
     private void handleRequestChatHistory(Integer userId, WebSocketMessage<?> webSocketMessage, WebSocketSession session) {
         try {
@@ -122,6 +124,7 @@ public class ChatWebSocketHandler extends TextWebSocketHandler {
             // 获取历史消息
             List<ChatMessageData<?>> historyMessages = chatMessageService.getHistoryMessages(
                 userId,
+                requestData.chatId(),
                 requestData.chatType(),
                 requestData.lastMessageId(),
                 20 // 每次获取20条消息

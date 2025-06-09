@@ -243,37 +243,51 @@ public class ChatMessageService {
 
 
     /**
-     * 获取历史消息
+     * 获取历史消息。方法会先检查会话是否存在，检查用户是否在会话中，
+     * 然后查询消息表中匹配该会话的消息（按照ID正序排列）
      *
-     * @param userId        请求用户ID
+     * @param userId        发出请求的用户ID，用于验证用户是否在会话中
+     * @param chatId        会话ID
      * @param chatType      聊天类型
      * @param lastMessageId 最后一条消息ID，如果为null则获取最新消息
      * @param limit         消息数量限制
      * @return 历史消息列表，按照ID升序排列
      */
-    public List<ChatMessageData<?>> getHistoryMessages(Integer userId, ChatType chatType, Long lastMessageId, int limit) {
+    public List<ChatMessageData<?>> getHistoryMessages(Integer userId, Long chatId, ChatType chatType, Long lastMessageId, int limit) {
         List<ChatMessageData<?>> result = new ArrayList<>();
 
         if (chatType == ChatType.PRIVATE) {
+            // 检查用户是否在会话中，若不在则抛出权限不足异常
+            QueryWrapper<PrivateChatEntity> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("chat_id", chatId);
+            PrivateChatEntity privateChatEntity = privateChatMapper.selectOne(queryWrapper);
+            if (privateChatEntity == null) {
+                // TODO 类似的位置需要添加把错误消息发送给客户端的功能！
+                logger.warn("获取历史消息时找不到会话：{}", chatId);
+                return result;
+            }
+            if (!privateChatEntity.getUser1Id().equals(userId) && !privateChatEntity.getUser2Id().equals(userId)) {
+                // TODO 类似的位置需要添加把错误消息发送给客户端的功能！
+                logger.warn("获取历史消息时用户{}不在会话{}中，权限不足", userId, chatId);
+                return result;
+            }
             // 构建查询条件
-            QueryWrapper<PrivateMessageEntity> queryWrapper = new QueryWrapper<>();
+            QueryWrapper<PrivateMessageEntity> queryWrapper2 = new QueryWrapper<>();
 
             // 查询条件：接收者或发送者是当前用户
-            queryWrapper.and(wrapper -> wrapper
-                .eq("sender_id", userId)
-                .or()
-                .eq("receiver_id", userId));
+            queryWrapper2.and(wrapper -> wrapper
+                .eq("chat_id", chatId));
 
             // 如果提供了lastMessageId，则获取比这个ID小的消息（更早的消息）
             if (lastMessageId != null && lastMessageId > 0) {
-                queryWrapper.lt("message_id", lastMessageId);
+                queryWrapper2.lt("message_id", lastMessageId);
             }
 
             // 按消息ID降序排序，限制返回数量
-            queryWrapper.orderByDesc("message_id").last("LIMIT " + limit);
+            queryWrapper2.orderByDesc("message_id").last("LIMIT " + limit);
 
             // 执行查询
-            List<PrivateMessageEntity> messages = privateMessageMapper.selectList(queryWrapper);
+            List<PrivateMessageEntity> messages = privateMessageMapper.selectList(queryWrapper2);
 
             // 转换为ChatMessageData格式
             for (PrivateMessageEntity message : messages) {
@@ -313,7 +327,7 @@ public class ChatMessageService {
 
                 case 2: // 好友请求消息
                     msgType = ChatMessageType.FRIEND_REQUEST;
-                    content = objectMapper.convertValue(message.getContent(), CompoundMessageContent.class);
+                    content = objectMapper.convertValue(message.getContent(), FriendRequestMessageContent.class);
                     break;
 
                 default:
