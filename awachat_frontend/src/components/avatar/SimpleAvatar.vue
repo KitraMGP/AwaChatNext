@@ -15,13 +15,15 @@ const avatarClass = computed(() => ({
   medium: props.size == "medium",
   large: props.size == "large"
 }))
+
+const emit = defineEmits(['click'])
 </script>
 
 <template>
-  <div v-if="props.text != null" class="avatar avatar-text" :class="avatarClass">
+  <div v-if="props.text != null" class="avatar avatar-text" :class="avatarClass" @click.stop="emit('click')">
     {{ props.text.charAt(0) }}
   </div>
-  <div v-if="props.avatarUrl != null" class="avatar avatar-image" :class="avatarClass">
+  <div v-if="props.avatarUrl != null" class="avatar avatar-image" :class="avatarClass" @click.stop="emit('click')">
     <img :src="props.avatarUrl" width="100%" height="100%">
   </div>
 </template>

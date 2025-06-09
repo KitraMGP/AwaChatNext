@@ -37,6 +37,7 @@ export interface ChatListResponse {
  */
 export interface DisplayChat {
   id: number
+  userId: number
   name: string
   lastMessage: string
   time: string

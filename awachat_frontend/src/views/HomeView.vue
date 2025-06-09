@@ -10,13 +10,19 @@ import { showFailMessage } from '@/services/api';
 import { previewChatMessageData, type ChatMessageData } from '@/dto/websocket';
 import HomeChatArea from '@/components/home/HomeChatArea.vue';
 import HomeChatList from '@/components/home/HomeChatList.vue';
+import type { UserData } from '@/dto/userDto';
+import dayjs from 'dayjs';
 
 // 会话数据
 const chats = ref<DisplayChat[]>([]);
 const chatInfos = ref<ChatInfo<PrivateChatInfo>[]>([])
 
-// 当前选中的会话，添加类型声明
+// 当前选中的会话
 const selectedChatId = ref<number | null>(null);
+
+// 个人信息对话框是否显示，以及显示的用户ID
+const showUserInfoDialog = ref(false)
+const userInfoDialogUser = ref<UserData | null>(null)
 
 /**
  * 处理消息列表中点击打开会话的逻辑。
@@ -57,6 +63,7 @@ async function loadChatList() {
           // 创建显示用的会话对象，直接使用新的数据结构
           return {
             id: privateChatInfo.chatId || index, // 优先使用chatId，如果为0则使用索引
+            userId: privateChatInfo.userId,
             name: privateChatInfo.nickname || privateChatInfo.username, // 优先使用昵称，如果没有则使用用户名
             lastMessage: privateChatInfo.lastMessageContent, // 暂无消息历史
             time: new Date(privateChatInfo.updatedAt).toLocaleString(), // 格式化时间
@@ -128,15 +135,44 @@ async function onReceivedNewChatMessage(data: ChatMessageData) {
   })
   // 上面用forEach可以方便地规避找不到匹配项或找到多个匹配项的问题
 }
+
+/**
+ * 打开用户信息展示对话框
+ * @param userId 要展示的用户ID
+ */
+async function openUserInfoDialog(userId: number) {
+  try {
+    const resp = await getUserInfoApi(userId)
+    if (resp.data.code === 200) {
+      userInfoDialogUser.value = resp.data.data
+      showUserInfoDialog.value = true
+    } else {
+      showFailMessage('', resp.data.msg)
+    }
+  } catch (e) {
+    showFailMessage('', e)
+  }
+}
 </script>
 
 <template>
   <main class="chat-container">
     <!-- 左侧会话列表 -->
     <HomeChatList :chats="chats" :selected-chat-id="selectedChatId" @select-chat="handleSelectChat"
-      @update-chatlist="loadChatList()" />
+      @update-chatlist="loadChatList()" @show-user-info-dialog="openUserInfoDialog" />
     <HomeChatArea :selectedChat="selectedChatId" :chat-info="getCurrentChatInfo()"
       @update_chatlist="onReceivedNewChatMessage" />
+    <el-dialog v-model="showUserInfoDialog" title="个人信息" width="300px" center>
+      <div class="user-detail">
+        <p><strong>用户名：</strong>{{ userInfoDialogUser?.username }}</p>
+        <p><strong>昵称：</strong>{{ userInfoDialogUser?.nickname || '暂无昵称' }}</p>
+        <!-- <p><strong>个人描述：</strong>{{ userInfoDialogUser?.description.trim().length === 0 ? '这个人很懒，什么也没留下' :
+          userInfoDialogUser?.description.trim() }}</p> -->
+        <p><strong>注册时间：</strong>{{ dayjs(userInfoDialogUser?.createdAt).format('L') }}</p>
+        <p v-if="userInfoDialogUser?.userId !== userData.value?.userId"><strong>{{ userInfoDialogUser?.isFriend ?
+          '这个人是你的好友' : '这个人还不是你的好友' }}</strong></p>
+      </div>
+    </el-dialog>
   </main>
 </template>
 

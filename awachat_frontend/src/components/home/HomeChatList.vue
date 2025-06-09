@@ -15,7 +15,7 @@ const props = defineProps<{
 }>()
 
 const userDataStore = useUserDataStore()
-const emit = defineEmits(["select-chat", "update-chatlist"])
+const emit = defineEmits(["select-chat", "update-chatlist", "show-user-info-dialog"])
 
 // 添加好友对话框
 const addFriendDialogVisible = ref(false);
@@ -30,6 +30,8 @@ function handleCommand(command: string): void {
     // 显示添加好友对话框
     addFriendDialogVisible.value = true;
     usernameInput.value = ''; // 清空输入框
+  } else if (command === 'profile') {
+    emit('show-user-info-dialog', userDataStore.value?.userId)
   } else if (command === 'logout') {
     logout()
   }
@@ -152,8 +154,6 @@ async function handleAddFriend() {
           <el-dropdown-menu>
             <el-dropdown-item>用户名：{{ userDataStore.value?.username }}</el-dropdown-item>
             <el-dropdown-item command="addFriend">添加好友</el-dropdown-item>
-            <el-dropdown-item command="newFriends">新朋友</el-dropdown-item>
-            <el-dropdown-item command="createGroup">发起群聊</el-dropdown-item>
             <el-dropdown-item command="profile">个人信息</el-dropdown-item>
             <el-dropdown-item command="logout" divided>退出登录</el-dropdown-item>
           </el-dropdown-menu>
@@ -163,9 +163,9 @@ async function handleAddFriend() {
 
     <!-- 添加好友对话框 -->
     <el-dialog v-model="addFriendDialogVisible" title="添加好友" width="30%" center>
-      <el-form>
+      <el-form @submit.prevent>
         <el-form-item label="用户名">
-          <el-input v-model="usernameInput" placeholder="请输入用户名"></el-input>
+          <el-input v-model="usernameInput" placeholder="请输入用户名" @keyup.enter="handleAddFriend"></el-input>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -180,7 +180,7 @@ async function handleAddFriend() {
     <div class="chat-items">
       <div v-for="item in props.chats" :key="item.id" class="chat-item"
         :class="{ 'active': selectedChatId === item.id }" @click="emit('select-chat', item.id)">
-        <SimpleAvatar :text="item.name" size="medium" />
+        <SimpleAvatar :text="item.name" size="medium" @click="emit('show-user-info-dialog', item.userId)" />
         <div class="content">
           <div class="name-time">
             <span class="name">{{ item.name }}</span>
