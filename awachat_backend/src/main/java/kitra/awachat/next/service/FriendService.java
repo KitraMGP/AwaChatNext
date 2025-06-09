@@ -8,6 +8,7 @@ import kitra.awachat.next.mapper.PrivateMessageMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -86,20 +87,32 @@ public class FriendService {
             .eq("content_type", 2) // 好友请求消息类型
             .orderByDesc("sent_at");
 
-        PrivateMessageEntity requestMessage = privateMessageMapper.selectOne(queryWrapper);
+        List<PrivateMessageEntity> requestMessages = privateMessageMapper.selectList(queryWrapper);
 
-        if (requestMessage == null) {
+        if (requestMessages.isEmpty()) {
             return false;
         }
+        requestMessages.forEach(requestMessage -> {
+            // 更新消息内容，设置isAccepted为true
+            Map<String, Object> content = requestMessage.getContent();
+            content.put("isAccepted", true);
+            requestMessage.setContent(content);
 
-        // 更新消息内容，设置isAccepted为true
-        Map<String, Object> content = requestMessage.getContent();
-        content.put("isAccepted", true);
-        requestMessage.setContent(content);
-
-        // 更新消息
-        privateMessageMapper.updateById(requestMessage);
-
+            // 更新消息
+            privateMessageMapper.updateById(requestMessage);
+        });
         return true;
+    }
+
+    public boolean deleteFriend(Integer user1Id, Integer user2Id) {
+        // 确保user1Id < user2Id，保持一致性
+        if (user1Id > user2Id) {
+            Integer temp = user1Id;
+            user1Id = user2Id;
+            user2Id = temp;
+        }
+        QueryWrapper<FriendEntity> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("user1", user1Id).eq("user2", user2Id);
+        return friendMapper.delete(queryWrapper) > 0;
     }
 }

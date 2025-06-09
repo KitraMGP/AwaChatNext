@@ -2,16 +2,17 @@
 import type { ChatInfo, DisplayChat, PrivateChatInfo } from '@/dto/chat';
 import router from '@/router';
 import { chatListApi } from '@/services/chatApi';
-import { getUserInfoApi } from '@/services/userApi';
+import { deleteFriendApi, getUserInfoApi } from '@/services/userApi';
 import { initWebSocketService } from '@/services/initWebsocket';
 import { useUserDataStore } from '@/stores/userDataStore';
 import { onMounted, ref, watch } from 'vue';
-import { showFailMessage } from '@/services/api';
+import { showFailMessage, showSuccessfulMessage } from '@/services/api';
 import { previewChatMessageData, type ChatMessageData } from '@/dto/websocket';
 import HomeChatArea from '@/components/home/HomeChatArea.vue';
 import HomeChatList from '@/components/home/HomeChatList.vue';
 import type { UserData } from '@/dto/userDto';
 import dayjs from 'dayjs';
+import { ElButton, ElMessage, ElMessageBox } from 'element-plus';
 
 // 会话数据
 const chats = ref<DisplayChat[]>([]);
@@ -153,6 +154,43 @@ async function openUserInfoDialog(userId: number) {
     showFailMessage('', e)
   }
 }
+
+/**
+ * 删除好友
+ * @param userId 要删除的用户ID
+ */
+async function deleteFriend(userId: number) {
+  try {
+    // 等待用户确认
+    await ElMessageBox.confirm(
+      '确定要删除该好友吗？',
+      '删除好友',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    // 执行请求
+    const resp = await deleteFriendApi({ userId: userId })
+    if (resp.data.code === 200) {
+      showSuccessfulMessage('删除成功')
+      showUserInfoDialog.value = false
+    } else {
+      showFailMessage('', resp.data.msg)
+    }
+  } catch (e) {
+    // 用户取消
+    if (e === 'cancel') {
+      ElMessage({
+        message: '你取消了操作',
+        type: 'info'
+      })
+    } else {
+      showFailMessage('', e)
+    }
+  }
+}
 </script>
 
 <template>
@@ -171,6 +209,9 @@ async function openUserInfoDialog(userId: number) {
         <p><strong>注册时间：</strong>{{ dayjs(userInfoDialogUser?.createdAt).format('L') }}</p>
         <p v-if="userInfoDialogUser?.userId !== userData.value?.userId"><strong>{{ userInfoDialogUser?.isFriend ?
           '这个人是你的好友' : '这个人还不是你的好友' }}</strong></p>
+        <p v-if="userInfoDialogUser?.isFriend">
+          <ElButton type="danger" @click="deleteFriend(userInfoDialogUser?.userId)">删除好友</ElButton>
+        </p>
       </div>
     </el-dialog>
   </main>

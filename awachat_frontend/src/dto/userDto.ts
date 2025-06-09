@@ -38,3 +38,7 @@ export interface LogoutResponse {
 export interface AcceptFriendRequestRequest {
   originUserId: number
 }
+
+export interface DeleteFriendRequest {
+  userId: number
+}

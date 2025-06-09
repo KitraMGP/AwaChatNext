@@ -1,5 +1,6 @@
 import type {
   AcceptFriendRequestRequest,
+  DeleteFriendRequest,
   LoginRequest,
   LoginResponse,
   LogoutResponse,
@@ -30,3 +31,6 @@ export const acceptFriendRequestApi = (r: AcceptFriendRequestRequest) =>
     '/user/acceptFriendRequest',
     r,
   )
+
+export const deleteFriendApi = (r: DeleteFriendRequest) =>
+  api.post<DeleteFriendRequest, AxiosResponse<ApiResponse<null>>>('/user/deleteFriend', r)

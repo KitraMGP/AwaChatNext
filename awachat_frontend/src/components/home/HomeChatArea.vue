@@ -249,6 +249,11 @@ async function acceptFriendRequest(from: number) {
         message: '已接受好友请求',
         type: 'success'
       })
+      // 更新消息列表中的好友请求消息
+      messages.value.filter(msg => msg.msgType === ChatMessageType.FRIEND_REQUEST).forEach(msg => {
+        const content = msg.content as FriendRequestMessageContent
+        content.isAccepted = true
+      })
     } else {
       ElMessage({
         message: resp.data.msg,
